@@ -64,6 +64,9 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-display gradient-text mb-8 text-center">{emoji} {title}</h1>
           {children}
+          <div className="text-center mt-12 text-primary font-display text-sm tracking-wide">
+            Mr.Mwendwa — always yours ❤️💍
+          </div>
         </div>
       </div>
     );
@@ -107,6 +110,10 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
               </button>
             </form>
           )}
+
+          <div className="mt-6 text-primary font-display text-sm tracking-wide">
+            Mr.Mwendwa — always yours ❤️💍
+          </div>
         </div>
       </div>
     </div>
