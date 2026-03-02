@@ -25,10 +25,16 @@ const specialDates = [
 const LandingPage = () => {
   const { subscribedEmail, setSubscribedEmail } = useSite();
   const [emailInput, setEmailInput] = useState("");
+  const [backupEmail, setBackupEmail] = useState("");
+  const [showBackup, setShowBackup] = useState(false);
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (emailInput.trim()) {
+    if (!showBackup && emailInput.trim()) {
+      setShowBackup(true);
+      return;
+    }
+    if (emailInput.trim() && backupEmail.trim()) {
       setSubscribedEmail(emailInput.trim());
     }
   };
@@ -113,17 +119,27 @@ const LandingPage = () => {
                           You'll be notified by email when unlocked
                         </p>
                       ) : (
-                        <form onSubmit={handleEmailSubmit} className="flex gap-2">
+                        <form onSubmit={handleEmailSubmit} className="space-y-2">
                           <input
                             type="email"
                             value={emailInput}
                             onChange={(e) => setEmailInput(e.target.value)}
                             placeholder="Email for notification..."
                             required
-                            className="flex-1 px-3 py-1.5 rounded-lg bg-input border border-border text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 font-body"
+                            className="w-full px-3 py-1.5 rounded-lg bg-input border border-border text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 font-body"
                           />
-                          <button type="submit" className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-body hover:opacity-90 transition-opacity">
-                            Notify Me
+                          {showBackup && (
+                            <input
+                              type="email"
+                              value={backupEmail}
+                              onChange={(e) => setBackupEmail(e.target.value)}
+                              placeholder="Input backup email for surprise 💕"
+                              required
+                              className="w-full px-3 py-1.5 rounded-lg bg-input border border-border text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 font-body animate-fade-in-up"
+                            />
+                          )}
+                          <button type="submit" className="w-full px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-body hover:opacity-90 transition-opacity">
+                            {showBackup ? "Submit" : "Notify Me"}
                           </button>
                         </form>
                       )}

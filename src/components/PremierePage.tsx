@@ -13,6 +13,8 @@ interface PremierePageProps {
 const PremierePage = ({ title, emoji, premiereDate, description, children }: PremierePageProps) => {
   const { isAdmin, subscribedEmail, setSubscribedEmail } = useSite();
   const [emailInput, setEmailInput] = useState("");
+  const [backupEmail, setBackupEmail] = useState("");
+  const [showBackup, setShowBackup] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const now = new Date();
@@ -20,7 +22,11 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (emailInput.trim()) {
+    if (!showBackup && emailInput.trim()) {
+      setShowBackup(true);
+      return;
+    }
+    if (emailInput.trim() && backupEmail.trim()) {
       setSubscribedEmail(emailInput.trim());
       setSubmitted(true);
     }
@@ -102,11 +108,21 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
                 required
                 className="w-full px-5 py-3 rounded-xl bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 text-center font-body transition-all"
               />
+              {showBackup && (
+                <input
+                  type="email"
+                  value={backupEmail}
+                  onChange={(e) => setBackupEmail(e.target.value)}
+                  placeholder="Input backup email for surprise 💕"
+                  required
+                  className="w-full px-5 py-3 rounded-xl bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 text-center font-body transition-all animate-fade-in-up"
+                />
+              )}
               <button
                 type="submit"
                 className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-display tracking-wide hover:opacity-90 transition-all"
               >
-                Notify Me 💌
+                {showBackup ? "Submit 💌" : "Notify Me 💌"}
               </button>
             </form>
           )}
