@@ -3,23 +3,50 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { SiteProvider, useSite } from "@/context/SiteContext";
+import AccessGate from "@/components/AccessGate";
+import Navigation from "@/components/Navigation";
+import LandingPage from "@/pages/LandingPage";
+import OurStoryPage from "@/pages/OurStoryPage";
+import TheJourneyPage from "@/pages/TheJourneyPage";
+import LaughsPage from "@/pages/LaughsPage";
+import LettersPage from "@/pages/LettersPage";
+import GoalsPage from "@/pages/GoalsPage";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
+
+const AuthenticatedApp = () => {
+  const { isAuthenticated } = useSite();
+
+  if (!isAuthenticated) {
+    return <AccessGate />;
+  }
+
+  return (
+    <BrowserRouter>
+      <Navigation />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/our-story" element={<OurStoryPage />} />
+        <Route path="/the-journey" element={<TheJourneyPage />} />
+        <Route path="/laughs" element={<LaughsPage />} />
+        <Route path="/letters" element={<LettersPage />} />
+        <Route path="/goals" element={<GoalsPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <SiteProvider>
+        <AuthenticatedApp />
+      </SiteProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
