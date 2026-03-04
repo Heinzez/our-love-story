@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSite } from "@/context/SiteContext";
 import { Heart } from "lucide-react";
+
+const petals = Array.from({ length: 8 }).map((_, i) => ({
+  left: `${(i * 12.5) + Math.random() * 10}%`,
+  duration: `${8 + (i * 0.75)}s`,
+  delay: `${i * 0.6}s`,
+}));
 
 const AccessGate = () => {
   const { setIsAdmin, setIsAuthenticated } = useSite();
@@ -27,15 +33,15 @@ const AccessGate = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      {/* Floating petals background */}
-      {Array.from({ length: 8 }).map((_, i) => (
+      {/* Floating petals - static, no re-renders */}
+      {petals.map((petal, i) => (
         <div
           key={i}
           className="absolute text-2xl animate-petal pointer-events-none opacity-40"
           style={{
-            left: `${Math.random() * 100}%`,
-            animationDuration: `${8 + Math.random() * 6}s`,
-            animationDelay: `${Math.random() * 5}s`,
+            left: petal.left,
+            animationDuration: petal.duration,
+            animationDelay: petal.delay,
           }}
         >
           🌸

@@ -9,6 +9,7 @@ const tabs = [
   { path: "/laughs", label: "Laughs & Bloopers", icon: "😂" },
   { path: "/letters", label: "My Letters To You", icon: "💌" },
   { path: "/goals", label: "Goals & Dreams", icon: "⭐" },
+  { path: "/my-notes", label: "My Notes", icon: "📝" },
 ];
 
 const Navigation = () => {

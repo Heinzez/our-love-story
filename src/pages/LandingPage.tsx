@@ -7,12 +7,24 @@ import photo6 from "@/assets/photo6.jpg";
 import photo7 from "@/assets/photo7.jpg";
 import photo8 from "@/assets/photo8.jpg";
 import photo9 from "@/assets/photo9.jpg";
+import photo10 from "@/assets/photo10.jpg";
+import photo11 from "@/assets/photo11.jpg";
+import photo12 from "@/assets/photo12.jpg";
+import photo13 from "@/assets/photo13.jpg";
+import photo14 from "@/assets/photo14.jpg";
+import photo15 from "@/assets/photo15.jpg";
+import photo16 from "@/assets/photo16.jpg";
+import photo17 from "@/assets/photo17.jpg";
+import photo18 from "@/assets/photo18.jpg";
 import FloatingElements from "@/components/FloatingElements";
 import { Heart, Lock, Mail } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useState } from "react";
 
-const photos = [photo1, photo2, photo3, photo4, photo5, photo6, photo7, photo8, photo9];
+const photos = [
+  photo1, photo2, photo3, photo4, photo5, photo6, photo7, photo8, photo9,
+  photo10, photo11, photo12, photo13, photo14, photo15, photo16, photo17, photo18,
+];
 
 const specialDates = [
   { date: "November 2023", title: "Where It All Began", description: "The moment everything changed forever.", unlocked: true },
@@ -35,7 +47,7 @@ const LandingPage = () => {
       return;
     }
     if (emailInput.trim() && backupEmail.trim()) {
-      setSubscribedEmail(emailInput.trim());
+      setSubscribedEmail(emailInput.trim(), backupEmail.trim());
     }
   };
 
@@ -67,7 +79,7 @@ const LandingPage = () => {
             <div
               key={i}
               className="break-inside-avoid photo-frame rounded-xl overflow-hidden animate-fade-in-up"
-              style={{ animationDelay: `${i * 0.15}s` }}
+              style={{ animationDelay: `${i * 0.1}s` }}
             >
               <img
                 src={photo}
@@ -86,19 +98,15 @@ const LandingPage = () => {
           Special Dates
         </h2>
         <div className="relative">
-          {/* Timeline line */}
           <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-primary/60 via-accent/40 to-border/20" />
-
           <div className="space-y-8">
             {specialDates.map((item, i) => (
               <div key={i} className="relative pl-16 animate-fade-in-up" style={{ animationDelay: `${i * 0.2}s` }}>
-                {/* Dot */}
                 <div className={`absolute left-4 top-2 w-5 h-5 rounded-full border-2 ${
                   item.unlocked
                     ? "bg-primary border-primary shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
                     : "bg-muted border-border"
                 }`} />
-
                 <div className={`glass-card rounded-xl p-6 transition-all ${
                   item.unlocked ? "border-primary/20" : "opacity-70"
                 }`}>

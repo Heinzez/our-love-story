@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SiteProvider, useSite } from "@/context/SiteContext";
 import AccessGate from "@/components/AccessGate";
+import WelcomeNote from "@/components/WelcomeNote";
 import Navigation from "@/components/Navigation";
 import LandingPage from "@/pages/LandingPage";
 import OurStoryPage from "@/pages/OurStoryPage";
@@ -12,6 +13,7 @@ import TheJourneyPage from "@/pages/TheJourneyPage";
 import LaughsPage from "@/pages/LaughsPage";
 import LettersPage from "@/pages/LettersPage";
 import GoalsPage from "@/pages/GoalsPage";
+import MyNotesPage from "@/pages/MyNotesPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +27,7 @@ const AuthenticatedApp = () => {
 
   return (
     <BrowserRouter>
+      <WelcomeNote />
       <Navigation />
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -33,6 +36,7 @@ const AuthenticatedApp = () => {
         <Route path="/laughs" element={<LaughsPage />} />
         <Route path="/letters" element={<LettersPage />} />
         <Route path="/goals" element={<GoalsPage />} />
+        <Route path="/my-notes" element={<MyNotesPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
