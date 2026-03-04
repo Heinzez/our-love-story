@@ -1,31 +1,33 @@
 import { useMemo } from "react";
+import photo1 from "@/assets/photo1.jpg";
+import photo3 from "@/assets/photo3.jpg";
+import photo5 from "@/assets/photo5.jpg";
+import photo10 from "@/assets/photo10.jpg";
+import photo16 from "@/assets/photo16.jpg";
+
+const bubblePhotoSrcs = [photo1, photo3, photo5, photo10, photo16];
 
 const FloatingElements = () => {
   const bubblePhotos = useMemo(() => {
-    const photos = [
-      "/src/assets/photo1.jpg", "/src/assets/photo3.jpg", "/src/assets/photo5.jpg",
-      "/src/assets/photo6.jpg", "/src/assets/photo8.jpg",
-    ];
-    return photos.map((src, i) => ({
+    return bubblePhotoSrcs.map((src, i) => ({
       src,
       left: `${10 + (i * 20)}%`,
-      duration: `${12 + Math.random() * 8}s`,
+      duration: `${12 + i * 1.5}s`,
       delay: `${i * 2.5}s`,
-      size: 50 + Math.random() * 30,
+      size: 50 + i * 6,
     }));
   }, []);
 
-  const petals = useMemo(() => 
+  const petals = useMemo(() =>
     Array.from({ length: 12 }).map((_, i) => ({
       emoji: ["🌸", "🌺", "🌹", "💐", "🪷"][i % 5],
-      left: `${Math.random() * 100}%`,
-      duration: `${10 + Math.random() * 8}s`,
-      delay: `${Math.random() * 8}s`,
+      left: `${(i * 8.3)}%`,
+      duration: `${10 + i * 0.7}s`,
+      delay: `${i * 0.7}s`,
     })), []);
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-      {/* Floating bubble photos */}
       {bubblePhotos.map((bubble, i) => (
         <div
           key={`bubble-${i}`}
@@ -43,7 +45,6 @@ const FloatingElements = () => {
         </div>
       ))}
 
-      {/* Falling petals */}
       {petals.map((petal, i) => (
         <div
           key={`petal-${i}`}

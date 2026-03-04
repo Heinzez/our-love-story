@@ -27,7 +27,7 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
       return;
     }
     if (emailInput.trim() && backupEmail.trim()) {
-      setSubscribedEmail(emailInput.trim());
+      setSubscribedEmail(emailInput.trim(), backupEmail.trim());
       setSubmitted(true);
     }
   };
