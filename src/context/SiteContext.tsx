@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SavedNote {
   id: string;
@@ -43,17 +44,21 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
     return stored ? JSON.parse(stored) : [];
   });
 
-  const handleSetEmail = (email: string, backup?: string) => {
+  const handleSetEmail = async (email: string, backup?: string) => {
     localStorage.setItem("queen-email", email);
     setSubscribedEmailState(email);
     if (backup) {
       localStorage.setItem("queen-backup-email", backup);
       setBackupEmailState(backup);
     }
-    // Store all collected emails
-    const allEmails = JSON.parse(localStorage.getItem("queen-all-emails") || "[]");
-    allEmails.push({ primary: email, backup: backup || null, date: new Date().toISOString() });
-    localStorage.setItem("queen-all-emails", JSON.stringify(allEmails));
+    // Store to database via edge function
+    try {
+      await supabase.functions.invoke('subscribe-email', {
+        body: { primary_email: email, backup_email: backup || null },
+      });
+    } catch (err) {
+      console.error('Failed to store email to database:', err);
+    }
   };
 
   const handleSetAuthenticated = (v: boolean) => {
