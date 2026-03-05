@@ -18,7 +18,7 @@ import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const AuthenticatedApp = () => {
+const AuthenticatedApp = (): JSX.Element => {
   const { isAuthenticated } = useSite();
 
   if (!isAuthenticated) {
