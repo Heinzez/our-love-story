@@ -35,6 +35,27 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_notes: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          text: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
