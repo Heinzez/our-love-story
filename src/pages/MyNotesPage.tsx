@@ -26,7 +26,7 @@ const MyNotesPage = () => {
             {savedNotes.map((note, i) => (
               <div
                 key={note.id}
-                className="glass-card rounded-xl p-6 animate-fade-in-up"
+                className={`glass-card rounded-xl p-6 animate-fade-in-up ${i === 0 ? "ring-2 ring-primary/30" : ""}`}
                 style={{ animationDelay: `${i * 0.1}s` }}
               >
                 <p className="text-foreground font-script text-lg italic mb-3">"{note.text}"</p>
