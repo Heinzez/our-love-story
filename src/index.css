@@ -197,3 +197,16 @@
   from { transform: rotate(0deg) translateX(var(--orbit-radius, 140px)) rotate(0deg); }
   to { transform: rotate(360deg) translateX(var(--orbit-radius, 140px)) rotate(-360deg); }
 }
+
+@keyframes glowSnake {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.4),
+                0 0 40px rgba(244, 63, 94, 0.2),
+                0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(236, 72, 153, 0.6),
+                0 0 80px rgba(244, 63, 94, 0.4),
+                0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+}

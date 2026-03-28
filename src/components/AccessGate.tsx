@@ -37,7 +37,10 @@ const AccessGate = () => {
       </div>
 
       <div className="relative z-10 w-full max-w-md mx-4">
-        <div className="glass-card rounded-2xl shadow-2xl overflow-hidden border border-border/50">
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-pink-500/20 via-rose-500/20 to-pink-500/20 blur-2xl animate-pulse" style={{ animation: "glowSnake 4s ease-in-out infinite" }} />
+        <div className="glass-card rounded-2xl shadow-2xl overflow-hidden border border-border/50 relative" style={{
+          boxShadow: "0 0 30px rgba(236, 72, 153, 0.3), 0 20px 60px rgba(0, 0, 0, 0.3)"
+        }}>
           <div className="px-8 py-10 md:px-12 md:py-14">
             <div className="flex flex-col items-center mb-8">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent/80 flex items-center justify-center mb-6 shadow-lg">
