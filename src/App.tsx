@@ -15,11 +15,21 @@ import LettersPage from "@/pages/LettersPage";
 import GoalsPage from "@/pages/GoalsPage";
 import MyNotesPage from "@/pages/MyNotesPage";
 import NotFound from "@/pages/NotFound";
+import { useEffect, useState } from "react";
 
 const queryClient = new QueryClient();
 
 const AuthenticatedApp = (): JSX.Element => {
   const { isAuthenticated } = useSite();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div className="min-h-screen bg-background" />;
+  }
 
   if (!isAuthenticated) {
     return <AccessGate />;
