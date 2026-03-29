@@ -36,13 +36,15 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showWelcomeNote, setShowWelcomeNote] = useState(false);
   const [hasNewNote, setHasNewNote] = useState(false);
-  const [subscribedEmail, setSubscribedEmailState] = useState<string | null>(
-    localStorage.getItem("queen-email")
-  );
-  const [backupEmail, setBackupEmailState] = useState<string | null>(
-    localStorage.getItem("queen-backup-email")
-  );
+  const [subscribedEmail, setSubscribedEmailState] = useState<string | null>(null);
+  const [backupEmail, setBackupEmailState] = useState<string | null>(null);
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
+
+  // Initialize localStorage values after hydration
+  useEffect(() => {
+    setSubscribedEmailState(localStorage.getItem("queen-email"));
+    setBackupEmailState(localStorage.getItem("queen-backup-email"));
+  }, []);
 
   // Load notes from DB on authentication
   useEffect(() => {
