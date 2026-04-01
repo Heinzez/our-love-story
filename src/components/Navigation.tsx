@@ -10,6 +10,7 @@ const tabs = [
   { path: "/laughs", label: "Laughs & Bloopers", icon: "😂" },
   { path: "/letters", label: "My Letters To You", icon: "💌" },
   { path: "/goals", label: "Goals & Dreams", icon: "⭐" },
+  { path: "/gifts", label: "Gifts", icon: "🎁" },
   { path: "/my-notes", label: "My Notes", icon: "📝" },
 ];
 
