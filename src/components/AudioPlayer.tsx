@@ -1,13 +1,13 @@
 import { useRef, useState, useEffect } from "react";
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
 const AudioPlayer = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(30);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
     const audio = new Audio("/my-lover.mp3");
@@ -15,12 +15,13 @@ const AudioPlayer = () => {
     audio.volume = volume / 100;
     audioRef.current = audio;
 
-    // Attempt autoplay
+    audio.addEventListener("play", () => setIsPlaying(true));
+    audio.addEventListener("pause", () => setIsPlaying(false));
+
     const tryPlay = () => {
-      audio.play().then(() => setHasStarted(true)).catch(() => {
-        // Autoplay blocked — start on first user interaction
+      audio.play().catch(() => {
         const handler = () => {
-          audio.play().then(() => setHasStarted(true));
+          audio.play();
           document.removeEventListener("click", handler);
         };
         document.addEventListener("click", handler);
@@ -40,16 +41,25 @@ const AudioPlayer = () => {
     }
   }, [volume, isMuted]);
 
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+  };
+
   const toggleMute = () => setIsMuted((m) => !m);
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-[90] flex items-center gap-3"
+      className="fixed bottom-4 right-4 z-[90] flex items-center gap-2 sm:bottom-6 sm:right-6 sm:gap-3"
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
     >
       {isExpanded && (
-        <div className="glass-card rounded-full px-4 py-2 flex items-center gap-3 animate-fade-in-up w-36">
+        <div className="glass-card rounded-full px-3 py-2 flex items-center gap-2 animate-fade-in-up w-28 sm:w-36 sm:px-4 sm:gap-3">
           <Slider
             value={[isMuted ? 0 : volume]}
             onValueChange={([v]) => {
@@ -63,11 +73,18 @@ const AudioPlayer = () => {
         </div>
       )}
       <button
+        onClick={togglePlay}
+        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full glass-card flex items-center justify-center text-primary hover:text-accent transition-colors shadow-lg"
+        aria-label={isPlaying ? "Pause" : "Play"}
+      >
+        {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5" />}
+      </button>
+      <button
         onClick={toggleMute}
-        className="w-11 h-11 rounded-full glass-card flex items-center justify-center text-primary hover:text-accent transition-colors shadow-lg"
+        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full glass-card flex items-center justify-center text-primary hover:text-accent transition-colors shadow-lg"
         aria-label={isMuted ? "Unmute" : "Mute"}
       >
-        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+        {isMuted ? <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" /> : <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />}
       </button>
     </div>
   );

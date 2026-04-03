@@ -24,20 +24,9 @@ const queryClient = new QueryClient();
 
 const AuthenticatedApp = (): JSX.Element => {
   const { isAuthenticated } = useSite();
-  const [mounted, setMounted] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const handleSplashComplete = useCallback(() => {
-    setShowSplash(false);
-  }, []);
-
-  if (!mounted) {
-    return <div className="min-h-screen bg-background" />;
-  }
+  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
 
   if (showSplash) {
     return <SplashScreen onComplete={handleSplashComplete} />;
