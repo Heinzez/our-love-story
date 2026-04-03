@@ -26,6 +26,8 @@ const AuthenticatedApp = (): JSX.Element => {
   const { isAuthenticated } = useSite();
   const [showSplash, setShowSplash] = useState(true);
 
+  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
+
   if (showSplash) {
     return <SplashScreen onComplete={handleSplashComplete} />;
   }
