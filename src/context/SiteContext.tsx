@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SavedNote {
   id: string;
@@ -46,12 +47,15 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetch("/api/saved-notes")
-        .then((r) => r.json())
-        .then((data: SavedNote[]) => {
-          if (Array.isArray(data)) setSavedNotes(data);
-        })
-        .catch((err) => console.error("Failed to load notes:", err));
+      supabase
+        .from("saved_notes")
+        .select("id, text, date")
+        .order("created_at", { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && Array.isArray(data)) {
+            setSavedNotes(data as SavedNote[]);
+          }
+        });
     }
   }, [isAuthenticated]);
 
@@ -63,10 +67,9 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
       setBackupEmailState(backup);
     }
     try {
-      await fetch("/api/subscribe-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ primary_email: email, backup_email: backup || null }),
+      await supabase.from("email_subscribers").insert({
+        primary_email: email,
+        backup_email: backup || null,
       });
     } catch (err) {
       console.error("Failed to store email:", err);
@@ -76,11 +79,8 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
   const handleSetAuthenticated = (v: boolean) => {
     setIsAuthenticated(v);
     if (v) {
-      // Session-specific: only show once per browser session.
-      // sessionStorage clears on tab/window close → new session = new note.
       const alreadyShown = sessionStorage.getItem("queen-note-shown") === "1";
       if (!alreadyShown) {
-        // Assign a stable random note index for this session
         if (!sessionStorage.getItem("queen-note-idx")) {
           sessionStorage.setItem("queen-note-idx", String(Math.floor(Math.random() * 66)));
         }
@@ -97,12 +97,12 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const res = await fetch("/api/saved-notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: note.id, text: note.text, date: note.date }),
+      const { error } = await supabase.from("saved_notes").insert({
+        id: note.id,
+        text: note.text,
+        date: note.date,
       });
-      if (res.ok) {
+      if (!error) {
         setSavedNotes((prev) => [note, ...prev]);
         setHasNewNote(true);
       }
