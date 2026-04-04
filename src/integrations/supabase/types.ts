@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_codes: {
+        Row: {
+          answer: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: []
+      }
       email_subscribers: {
         Row: {
           backup_email: string | null
