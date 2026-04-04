@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSite } from "@/context/SiteContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Lock, ArrowRight, CircleAlert as AlertCircle } from "lucide-react";
 
 const AccessGate = () => {
@@ -11,20 +12,25 @@ const AccessGate = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const normalized = answer.trim().toLowerCase();
 
-    setTimeout(() => {
-      if (normalized === "shyness") {
-        setIsAdmin(false);
-        setIsAuthenticated(true);
-      } else if (normalized === "your ability to lie") {
-        setIsAdmin(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('validate-access', {
+        body: { answer: answer.trim() },
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.authenticated) {
+        setIsAdmin(data.role === 'admin');
         setIsAuthenticated(true);
       } else {
         setError("Incorrect answer. Please try again.");
         setIsSubmitting(false);
       }
-    }, 400);
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
