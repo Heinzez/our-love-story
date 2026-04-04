@@ -119,6 +119,12 @@ app.post("/api/telegram/webhook", async (req, res) => {
   }
 });
 
+// Manually trigger Telegram webhook registration (useful after Vercel deploy)
+app.get("/api/telegram/setup-webhook", async (_req, res) => {
+  await registerTelegramWebhook();
+  res.json({ ok: true, message: "Webhook registration attempted — check server logs." });
+});
+
 // ── AI FALLBACK RESPONSES ─────────────────────────────────────
 const AI_RESPONSES = [
   "I'm always thinking of you 💕",
