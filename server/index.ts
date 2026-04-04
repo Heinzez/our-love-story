@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import fs from "fs";
 import nodemailer from "nodemailer";
 import multer from "multer";
 import { db } from "./db.js";
@@ -22,21 +21,9 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// ── STATIC UPLOADS ────────────────────────────────────────────
-const uploadsDir = path.join(__dirname, "../public/uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-app.use("/uploads", express.static(uploadsDir));
-
-// ── MULTER ────────────────────────────────────────────────────
-const diskStorage = multer.diskStorage({
-  destination: uploadsDir,
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
-    cb(null, `photo_${Date.now()}${ext}`);
-  },
-});
+// ── MULTER — memory storage (works on serverless + local) ─────
 const upload = multer({
-  storage: diskStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
@@ -67,9 +54,12 @@ async function sendTelegram(text: string) {
 async function registerTelegramWebhook() {
   const token = tgToken();
   if (!token) return;
-  const domain = (process.env.REPLIT_DOMAINS || "").split(",")[0].trim();
-  if (!domain) { console.log("No REPLIT_DOMAINS — Telegram webhook not registered"); return; }
-  const webhookUrl = `https://${domain}/api/telegram/webhook`;
+  // Support SITE_URL (set on Vercel) or REPLIT_DOMAINS (set on Replit)
+  const siteUrl = process.env.SITE_URL?.trim();
+  const replitDomain = (process.env.REPLIT_DOMAINS || "").split(",")[0].trim();
+  const base = siteUrl || (replitDomain ? `https://${replitDomain}` : "");
+  if (!base) { console.log("No domain — Telegram webhook not registered"); return; }
+  const webhookUrl = `${base}/api/telegram/webhook`;
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
       method: "POST",
@@ -294,9 +284,11 @@ app.get("/api/photos", async (_req, res) => {
 app.post("/api/photos/upload", upload.single("photo"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file provided" });
-    const url = `/uploads/${req.file.filename}`;
+    // Store as base64 data URL — works on serverless and local
+    const b64 = req.file.buffer.toString("base64");
+    const dataUrl = `data:${req.file.mimetype};base64,${b64}`;
     const caption = (req.body.caption as string) || null;
-    const [photo] = await db.insert(userPhotos).values({ url, caption }).returning();
+    const [photo] = await db.insert(userPhotos).values({ url: dataUrl, caption }).returning();
     res.json(photo);
   } catch (err) {
     console.error("photo upload error:", err);
@@ -309,8 +301,6 @@ app.delete("/api/photos/:id", async (req, res) => {
     const { id } = req.params;
     const [photo] = await db.select().from(userPhotos).where(eq(userPhotos.id, id));
     if (!photo) return res.status(404).json({ error: "Not found" });
-    const filePath = path.join(uploadsDir, path.basename(photo.url));
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     await db.delete(userPhotos).where(eq(userPhotos.id, id));
     res.json({ success: true });
   } catch (err) {
@@ -502,14 +492,19 @@ app.get("/api/gift/history", async (_req, res) => {
   }
 });
 
-// Serve static frontend in production
-if (process.env.NODE_ENV === "production") {
+// Serve static frontend in production (non-Vercel only)
+if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
   const distPath = path.join(__dirname, "../dist/public");
   app.use(express.static(distPath));
   app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  registerTelegramWebhook();
-});
+// On Vercel the function is invoked per-request — no persistent listen needed
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    registerTelegramWebhook();
+  });
+}
+
+export default app;
