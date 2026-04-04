@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SiteProvider, useSite } from "@/context/SiteContext";
 import AccessGate from "@/components/AccessGate";
@@ -21,8 +22,6 @@ import GiftPage from "@/pages/GiftPage";
 import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/NotFound";
 import { useCallback, useState } from "react";
-
-const queryClient = new QueryClient();
 
 const AuthenticatedApp = (): JSX.Element => {
   const { isAuthenticated } = useSite();

@@ -45,9 +45,13 @@ const upload = multer({
 });
 
 // ── TELEGRAM ──────────────────────────────────────────────────
+
+function tgToken() { return process.env.TELEGRAM_BOT_TOKEN || ""; }
+function tgChatId() { return process.env.TELEGRAM_CHAT_ID || ""; }
+
 async function sendTelegram(text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = tgToken();
+  const chatId = tgChatId();
   if (!token || !chatId) return;
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -59,6 +63,71 @@ async function sendTelegram(text: string) {
     console.error("Telegram notify failed:", e);
   }
 }
+
+async function registerTelegramWebhook() {
+  const token = tgToken();
+  if (!token) return;
+  const domain = (process.env.REPLIT_DOMAINS || "").split(",")[0].trim();
+  if (!domain) { console.log("No REPLIT_DOMAINS — Telegram webhook not registered"); return; }
+  const webhookUrl = `https://${domain}/api/telegram/webhook`;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: webhookUrl, allowed_updates: ["message"] }),
+    });
+    const data = await res.json() as { ok: boolean; description?: string };
+    if (data.ok) console.log(`Telegram webhook registered: ${webhookUrl}`);
+    else console.error("Webhook registration failed:", data.description);
+  } catch (e) {
+    console.error("Webhook registration error:", e);
+  }
+}
+
+// ── TELEGRAM WEBHOOK (incoming messages from admin) ────────────
+app.post("/api/telegram/webhook", async (req, res) => {
+  try {
+    res.json({ ok: true }); // Acknowledge immediately
+    const { message } = req.body;
+    if (!message?.text) return;
+
+    const fromChatId = String(message.chat.id);
+    const adminChatId = tgChatId();
+
+    // Only accept messages from the registered admin chat
+    if (!adminChatId || fromChatId !== adminChatId) return;
+
+    const text: string = message.text.trim();
+
+    // /reply <message> — save as a reply from me
+    if (text.toLowerCase().startsWith("/reply ")) {
+      const replyText = text.slice(7).trim();
+      if (!replyText) return;
+      await db.insert(chatMessages).values({
+        text: replyText,
+        sender: "me",
+        status: "delivered",
+        date: todayStr(),
+        isAi: false,
+      });
+      // Confirm back to admin on Telegram
+      await sendTelegram(`✅ Reply sent: "${replyText}"`);
+      return;
+    }
+
+    // /help — show available commands
+    if (text === "/help" || text === "/start") {
+      await sendTelegram(
+        `💌 <b>IlyNimo Bot — Commands</b>\n\n` +
+        `/reply &lt;message&gt; — Send a reply to her\n` +
+        `/help — Show this message\n\n` +
+        `<i>You'll receive a notification here every time she sends a message through the site.</i>`
+      );
+    }
+  } catch (e) {
+    console.error("Telegram webhook error:", e);
+  }
+});
 
 // ── AI FALLBACK RESPONSES ─────────────────────────────────────
 const AI_RESPONSES = [
@@ -432,4 +501,7 @@ if (process.env.NODE_ENV === "production") {
   app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
 }
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  registerTelegramWebhook();
+});
