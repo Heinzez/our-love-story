@@ -36,11 +36,13 @@ import photo35 from "@/assets/photo35.jpg";
 import photo36 from "@/assets/photo36.jpg";
 import photo37 from "@/assets/photo37.jpg";
 import FloatingElements from "@/components/FloatingElements";
-import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight, Plus, ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UserPhoto } from "../../shared/schema";
 
-const allPhotos = [
+const STATIC_PHOTOS = [
   photo1, photo2, photo3, photo4, photo5, photo6, photo7,
   photo8, photo9, photo10, photo11, photo12, photo13, photo14,
   photo15, photo16, photo17, photo18, photoNew1, photoNew2, photoNew3,
@@ -67,22 +69,23 @@ const specialDates = [
   { date: "December 2024", title: "End of Year Magic", description: "Coming soon...", unlocked: false },
 ];
 
-// Always exactly 6 groups — photos distributed round-robin.
-// Adding more photos later fills existing groups, never creates a 7th.
 const NUM_GROUPS = 6;
-const GROUPS: string[][] = Array.from({ length: NUM_GROUPS }, () => []);
-allPhotos.forEach((photo, i) => GROUPS[i % NUM_GROUPS].push(photo));
 
-// Track global index per group (for lightbox to work across all photos)
-const GROUP_START_INDICES = GROUPS.reduce<number[]>((acc, _, i) => {
-  if (i === 0) return [0];
-  acc.push(acc[i - 1] + GROUPS[i - 1].length);
-  return acc;
-}, []);
+function buildGroups(allPhotos: string[]) {
+  const GROUPS: string[][] = Array.from({ length: NUM_GROUPS }, () => []);
+  allPhotos.forEach((photo, i) => GROUPS[i % NUM_GROUPS].push(photo));
+  const startIndices = GROUPS.reduce<number[]>((acc, _, i) => {
+    if (i === 0) return [0];
+    acc.push(acc[i - 1] + GROUPS[i - 1].length);
+    return acc;
+  }, []);
+  return { GROUPS, startIndices };
+}
 
 // ── Lightbox ──────────────────────────────────────────────
-const Lightbox = ({ index, onClose, onPrev, onNext }: {
-  index: number; onClose: () => void; onPrev: () => void; onNext: () => void;
+const Lightbox = ({ index, total, src, caption, onClose, onPrev, onNext }: {
+  index: number; total: number; src: string; caption: string;
+  onClose: () => void; onPrev: () => void; onNext: () => void;
 }) => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -100,43 +103,27 @@ const Lightbox = ({ index, onClose, onPrev, onNext }: {
       style={{ background: "rgba(5,2,10,0.92)", backdropFilter: "blur(20px)" }}
       onClick={onClose}
     >
-      {/* Close */}
       <button
         className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
         onClick={onClose}
       >
         <X className="w-5 h-5" />
       </button>
-
-      {/* Prev */}
       <button
         className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-primary/40 flex items-center justify-center text-white transition-colors z-10"
         onClick={(e) => { e.stopPropagation(); onPrev(); }}
       >
         <ChevronLeft className="w-6 h-6" />
       </button>
-
-      {/* Image */}
-      <div
-        className="relative max-w-[88vw] max-h-[88vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative max-w-[88vw] max-h-[88vh]" onClick={(e) => e.stopPropagation()}>
         <div className="polaroid" style={{ padding: "12px 12px 48px", maxWidth: "min(500px, 88vw)" }}>
-          <img
-            src={allPhotos[index]}
-            alt=""
-            className="w-full object-contain rounded-sm"
-            style={{ maxHeight: "70vh" }}
-          />
-          <span className="polaroid-caption text-sm">{captions[index % captions.length]}</span>
+          <img src={src} alt="" className="w-full object-contain rounded-sm" style={{ maxHeight: "70vh" }} />
+          <span className="polaroid-caption text-sm">{caption}</span>
         </div>
-        {/* Counter */}
         <div className="absolute -bottom-8 left-0 right-0 text-center text-white/40 text-xs font-body">
-          {index + 1} / {allPhotos.length}
+          {index + 1} / {total}
         </div>
       </div>
-
-      {/* Next */}
       <button
         className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-primary/40 flex items-center justify-center text-white transition-colors z-10"
         onClick={(e) => { e.stopPropagation(); onNext(); }}
@@ -147,10 +134,7 @@ const Lightbox = ({ index, onClose, onPrev, onNext }: {
   );
 };
 
-// ── Photo Group — fan-on-hover/tap, always max 4 cards ──────
-// All groups use the 3D stacked fan. Max 4 photos shown in fan;
-// extra photos accessible via the lightbox arrows.
-// Supports both mouse hover (desktop) and tap (mobile).
+// ── Photo Group ──────────────────────────────────────────────
 const CARD_W = 138;
 const CARD_H = 195;
 const FAN_RADIUS = 190;
@@ -161,8 +145,6 @@ const PhotoGroup = ({
   groupPhotos: string[]; groupIndex: number; startIndex: number; onOpen: (i: number) => void;
 }) => {
   const [active, setActive] = useState(false);
-
-  // Show at most 4 in the fan; the rest are reachable via lightbox
   const fanPhotos = groupPhotos.slice(0, 4);
   const count = fanPhotos.length;
   const extra = groupPhotos.length - 4;
@@ -170,7 +152,6 @@ const PhotoGroup = ({
   const open = () => setActive(true);
   const close = () => setActive(false);
 
-  // First tap on closed deck: open fan. Second tap on card: open lightbox.
   const handleContainerClick = (e: React.MouseEvent) => {
     if (!active) { e.stopPropagation(); open(); }
   };
@@ -181,11 +162,7 @@ const PhotoGroup = ({
   return (
     <div
       className="relative flex justify-center select-none"
-      style={{
-        width: "100%", height: CARD_H + 28,
-        perspective: "1000px", perspectiveOrigin: "50% 80%",
-        overflow: "visible",
-      }}
+      style={{ width: "100%", height: CARD_H + 28, perspective: "1000px", perspectiveOrigin: "50% 80%", overflow: "visible" }}
       onMouseEnter={open}
       onMouseLeave={close}
       onClick={handleContainerClick}
@@ -232,19 +209,80 @@ const PhotoGroup = ({
           </div>
         );
       })}
-
-      {/* Hint shown when collapsed */}
       {!active && (
         <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground/40 font-body tracking-widest uppercase whitespace-nowrap pointer-events-none">
           {extra > 0 ? `tap · ${groupPhotos.length} photos` : "tap to reveal"}
         </div>
       )}
-
-      {/* Group index label (subtle) */}
       <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-muted-foreground/20 font-body pointer-events-none">
         {groupIndex + 1}
       </div>
     </div>
+  );
+};
+
+// ── Photo Upload Button ────────────────────────────────────────
+const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    for (const file of Array.from(files)) {
+      const formData = new FormData();
+      formData.append("photo", file);
+      try {
+        const res = await fetch("/api/photos/upload", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Upload failed");
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setUploading(false);
+    onUploaded();
+  };
+
+  return (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        data-testid="input-photo-upload"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+      <div
+        className="relative flex justify-center select-none"
+        style={{ width: "100%", height: CARD_H + 28 }}
+      >
+        <button
+          data-testid="button-photo-add"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 text-primary/60 hover:text-primary transition-all duration-300 active:scale-95 disabled:opacity-50"
+          style={{ width: CARD_W, height: CARD_H }}
+        >
+          {uploading
+            ? <Loader2 className="w-7 h-7 animate-spin" />
+            : <>
+                <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-body tracking-wider text-center leading-tight px-2">
+                  Add photos
+                </span>
+              </>
+          }
+        </button>
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground/30 font-body tracking-widest uppercase whitespace-nowrap pointer-events-none">
+          {uploading ? "uploading..." : "tap to add"}
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -256,13 +294,27 @@ const LandingPage = () => {
   const [showBackup, setShowBackup] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const qc = useQueryClient();
+
+  const { data: uploadedPhotos = [] } = useQuery<UserPhoto[]>({
+    queryKey: ["/api/photos"],
+    refetchInterval: false,
+  });
+
+  // Combine: user-uploaded (newest first) + static photos
+  const allPhotos = [
+    ...uploadedPhotos.map(p => p.url),
+    ...STATIC_PHOTOS,
+  ];
+
+  const { GROUPS, startIndices } = buildGroups(allPhotos);
 
   const openLightbox = useCallback((i: number) => setLightboxIdx(i), []);
   const closeLightbox = useCallback(() => setLightboxIdx(null), []);
   const prevPhoto = useCallback(() =>
-    setLightboxIdx((i) => (i === null ? null : (i - 1 + allPhotos.length) % allPhotos.length)), []);
+    setLightboxIdx((i) => (i === null ? null : (i - 1 + allPhotos.length) % allPhotos.length)), [allPhotos.length]);
   const nextPhoto = useCallback(() =>
-    setLightboxIdx((i) => (i === null ? null : (i + 1) % allPhotos.length)), []);
+    setLightboxIdx((i) => (i === null ? null : (i + 1) % allPhotos.length)), [allPhotos.length]);
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -279,14 +331,11 @@ const LandingPage = () => {
 
       {/* ── Animated Background ── */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        {/* Grid texture */}
         <div className="absolute inset-0 bg-grid opacity-100" />
-        {/* Animated colour blobs */}
         <div className="blob blob-1" />
         <div className="blob blob-2" />
         <div className="blob blob-3" />
         <div className="blob blob-4" />
-        {/* Vignette */}
         <div className="absolute inset-0" style={{
           background: "radial-gradient(ellipse 70% 60% at 50% 50%, transparent 40%, hsl(340 18% 5% / 0.7) 100%)"
         }} />
@@ -294,7 +343,15 @@ const LandingPage = () => {
 
       {/* Lightbox */}
       {lightboxIdx !== null && (
-        <Lightbox index={lightboxIdx} onClose={closeLightbox} onPrev={prevPhoto} onNext={nextPhoto} />
+        <Lightbox
+          index={lightboxIdx}
+          total={allPhotos.length}
+          src={allPhotos[lightboxIdx]}
+          caption={captions[lightboxIdx % captions.length]}
+          onClose={closeLightbox}
+          onPrev={prevPhoto}
+          onNext={nextPhoto}
+        />
       )}
 
       {/* ── Hero ── */}
@@ -334,6 +391,11 @@ const LandingPage = () => {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-display gradient-text mb-2">Our Memories</h2>
           <p className="text-muted-foreground text-sm font-body">hover each stack · click to open</p>
+          {uploadedPhotos.length > 0 && (
+            <p className="text-primary/50 text-xs font-body mt-1">
+              {uploadedPhotos.length} photo{uploadedPhotos.length !== 1 ? "s" : ""} added by you ✨
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-20">
@@ -342,10 +404,25 @@ const LandingPage = () => {
               key={groupIdx}
               groupPhotos={groupPhotos}
               groupIndex={groupIdx}
-              startIndex={GROUP_START_INDICES[groupIdx]}
+              startIndex={startIndices[groupIdx]}
               onOpen={openLightbox}
             />
           ))}
+        </div>
+
+        {/* Add Photos row */}
+        <div className="mt-20 pt-6 border-t border-border/20">
+          <div className="flex items-center gap-3 mb-10 justify-center">
+            <div className="h-px w-16 bg-gradient-to-r from-transparent to-primary/30" />
+            <div className="flex items-center gap-2 text-primary/50">
+              <ImagePlus className="w-4 h-4" />
+              <span className="text-xs font-body tracking-widest uppercase">Add your own</span>
+            </div>
+            <div className="h-px w-16 bg-gradient-to-l from-transparent to-primary/30" />
+          </div>
+          <div className="flex justify-center">
+            <PhotoUploadButton onUploaded={() => qc.invalidateQueries({ queryKey: ["/api/photos"] })} />
+          </div>
         </div>
       </section>
 

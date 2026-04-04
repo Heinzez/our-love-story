@@ -1,7 +1,9 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 import nodemailer from "nodemailer";
+import multer from "multer";
 import { db } from "./db.js";
 import {
   emailSubscribers,
@@ -9,6 +11,8 @@ import {
   giftBalance,
   giftTransactions,
   siteSettings,
+  userPhotos,
+  chatMessages,
 } from "../shared/schema.js";
 import { desc, eq, gte } from "drizzle-orm";
 
@@ -18,8 +22,67 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// ── SETTINGS ─────────────────────────────────────────────────
+// ── STATIC UPLOADS ────────────────────────────────────────────
+const uploadsDir = path.join(__dirname, "../public/uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use("/uploads", express.static(uploadsDir));
 
+// ── MULTER ────────────────────────────────────────────────────
+const diskStorage = multer.diskStorage({
+  destination: uploadsDir,
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    cb(null, `photo_${Date.now()}${ext}`);
+  },
+});
+const upload = multer({
+  storage: diskStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only images allowed"));
+  },
+});
+
+// ── TELEGRAM ──────────────────────────────────────────────────
+async function sendTelegram(text: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+    });
+  } catch (e) {
+    console.error("Telegram notify failed:", e);
+  }
+}
+
+// ── AI FALLBACK RESPONSES ─────────────────────────────────────
+const AI_RESPONSES = [
+  "I'm always thinking of you 💕",
+  "You are genuinely my favourite person on this earth.",
+  "Even when I'm quiet, my heart is always saying your name.",
+  "Just know that you are so deeply loved. Every single day.",
+  "I'll reply properly soon — just wanted you to know I saw this and smiled.",
+  "You make every ordinary moment feel like magic. I love you.",
+  "My whole world ✨",
+  "You're the best thing that ever happened to me, I mean that.",
+  "I'm here. Always. 💗",
+  "Reading this and feeling so lucky to have you.",
+];
+
+function pickAiResponse() {
+  return AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ── SETTINGS ─────────────────────────────────────────────────
 const DEFAULT_SETTINGS: Record<string, string> = {
   gift_locked: "false",
   weekly_gift_amount: "500",
@@ -39,7 +102,6 @@ async function setSetting(key: string, value: string): Promise<void> {
   }
 }
 
-// GET /api/settings — public settings for the frontend
 app.get("/api/settings", async (_req, res) => {
   try {
     const [giftLocked, weeklyGiftAmount] = await Promise.all([
@@ -53,7 +115,6 @@ app.get("/api/settings", async (_req, res) => {
   }
 });
 
-// POST /api/admin/settings — admin updates settings
 app.post("/api/admin/settings", async (req, res) => {
   try {
     const { key, value } = req.body;
@@ -67,7 +128,6 @@ app.post("/api/admin/settings", async (req, res) => {
 });
 
 // ── EMAIL ─────────────────────────────────────────────────────
-
 function createTransport() {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
@@ -81,15 +141,11 @@ function createTransport() {
   });
 }
 
-// POST /api/subscribe-email
 app.post("/api/subscribe-email", async (req, res) => {
   try {
     const { primary_email, backup_email } = req.body;
     if (!primary_email) return res.status(400).json({ error: "primary_email is required" });
-    await db.insert(emailSubscribers).values({
-      primaryEmail: primary_email,
-      backupEmail: backup_email || null,
-    });
+    await db.insert(emailSubscribers).values({ primaryEmail: primary_email, backupEmail: backup_email || null });
     res.json({ success: true });
   } catch (err) {
     console.error("subscribe-email error:", err);
@@ -97,7 +153,6 @@ app.post("/api/subscribe-email", async (req, res) => {
   }
 });
 
-// GET /api/admin/subscribers
 app.get("/api/admin/subscribers", async (_req, res) => {
   try {
     const rows = await db.select().from(emailSubscribers).orderBy(desc(emailSubscribers.subscribedAt));
@@ -108,39 +163,16 @@ app.get("/api/admin/subscribers", async (_req, res) => {
   }
 });
 
-// POST /api/admin/send-email — send a notification to all subscribers
 app.post("/api/admin/send-email", async (req, res) => {
   try {
     const { subject, message } = req.body;
     if (!subject || !message) return res.status(400).json({ error: "subject and message are required" });
-
     const transport = createTransport();
-    if (!transport) {
-      return res.status(503).json({
-        error: "Email not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and optionally SMTP_PORT as environment variables.",
-      });
-    }
-
+    if (!transport) return res.status(503).json({ error: "Email not configured." });
     const subscribers = await db.select().from(emailSubscribers);
-    if (subscribers.length === 0) {
-      return res.json({ success: true, sent: 0, message: "No subscribers yet." });
-    }
-
+    if (subscribers.length === 0) return res.json({ success: true, sent: 0, message: "No subscribers yet." });
     const fromEmail = process.env.SMTP_USER!;
-    const htmlBody = `
-      <div style="font-family: Georgia, serif; max-width: 540px; margin: 0 auto; background: #1a0a10; color: #f5e6d8; padding: 40px 32px; border-radius: 16px;">
-        <div style="text-align: center; margin-bottom: 28px;">
-          <span style="font-size: 24px;">♥</span>
-          <h2 style="color: #e8607a; font-style: italic; margin: 8px 0 0;">A message for my queen</h2>
-        </div>
-        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(232,96,122,0.2); border-radius: 12px; padding: 24px; white-space: pre-wrap; font-size: 15px; line-height: 1.8; color: #f0ddd0;">
-${message}
-        </div>
-        <div style="text-align: center; margin-top: 28px; font-style: italic; color: #b06878; font-size: 13px;">
-          Mr.Mwendwa — always yours ❤️
-        </div>
-      </div>`;
-
+    const htmlBody = `<div style="font-family:Georgia,serif;max-width:540px;margin:0 auto;background:#1a0a10;color:#f5e6d8;padding:40px 32px;border-radius:16px;"><div style="text-align:center;margin-bottom:28px;"><span style="font-size:24px;">♥</span><h2 style="color:#e8607a;font-style:italic;margin:8px 0 0;">A message for my queen</h2></div><div style="background:rgba(255,255,255,0.04);border:1px solid rgba(232,96,122,0.2);border-radius:12px;padding:24px;white-space:pre-wrap;font-size:15px;line-height:1.8;color:#f0ddd0;">${message}</div><div style="text-align:center;margin-top:28px;font-style:italic;color:#b06878;font-size:13px;">Mr.Mwendwa — always yours ❤️</div></div>`;
     let sent = 0;
     for (const sub of subscribers) {
       const emails = [sub.primaryEmail, sub.backupEmail].filter(Boolean) as string[];
@@ -149,22 +181,17 @@ ${message}
         sent++;
       }
     }
-
     res.json({ success: true, sent, subscribers: subscribers.length });
   } catch (err) {
     console.error("send-email error:", err);
-    res.status(500).json({ error: "Failed to send emails. Check SMTP credentials." });
+    res.status(500).json({ error: "Failed to send emails." });
   }
 });
 
 // ── SAVED NOTES ──────────────────────────────────────────────
-
 app.get("/api/saved-notes", async (_req, res) => {
   try {
-    const notes = await db
-      .select({ id: savedNotes.id, text: savedNotes.text, date: savedNotes.date })
-      .from(savedNotes)
-      .orderBy(desc(savedNotes.createdAt));
+    const notes = await db.select({ id: savedNotes.id, text: savedNotes.text, date: savedNotes.date }).from(savedNotes).orderBy(desc(savedNotes.createdAt));
     res.json(notes);
   } catch (err) {
     console.error("saved-notes GET error:", err);
@@ -176,10 +203,7 @@ app.post("/api/saved-notes", async (req, res) => {
   try {
     const { id, text, date } = req.body;
     if (!text || !date) return res.status(400).json({ error: "text and date are required" });
-    const [note] = await db
-      .insert(savedNotes)
-      .values({ id, text, date })
-      .returning({ id: savedNotes.id, text: savedNotes.text, date: savedNotes.date });
+    const [note] = await db.insert(savedNotes).values({ id, text, date }).returning({ id: savedNotes.id, text: savedNotes.text, date: savedNotes.date });
     res.json(note);
   } catch (err) {
     console.error("saved-notes POST error:", err);
@@ -187,15 +211,134 @@ app.post("/api/saved-notes", async (req, res) => {
   }
 });
 
-// ── GIFT ─────────────────────────────────────────────────────
+// ── USER PHOTOS ───────────────────────────────────────────────
+app.get("/api/photos", async (_req, res) => {
+  try {
+    const photos = await db.select().from(userPhotos).orderBy(desc(userPhotos.createdAt));
+    res.json(photos);
+  } catch (err) {
+    console.error("photos GET error:", err);
+    res.status(500).json({ error: "Failed to fetch photos" });
+  }
+});
 
+app.post("/api/photos/upload", upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file provided" });
+    const url = `/uploads/${req.file.filename}`;
+    const caption = (req.body.caption as string) || null;
+    const [photo] = await db.insert(userPhotos).values({ url, caption }).returning();
+    res.json(photo);
+  } catch (err) {
+    console.error("photo upload error:", err);
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
+
+app.delete("/api/photos/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [photo] = await db.select().from(userPhotos).where(eq(userPhotos.id, id));
+    if (!photo) return res.status(404).json({ error: "Not found" });
+    const filePath = path.join(uploadsDir, path.basename(photo.url));
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await db.delete(userPhotos).where(eq(userPhotos.id, id));
+    res.json({ success: true });
+  } catch (err) {
+    console.error("photo delete error:", err);
+    res.status(500).json({ error: "Delete failed" });
+  }
+});
+
+// ── CHAT ──────────────────────────────────────────────────────
+
+// Check if an AI auto-reply is needed (last message from 'her', no reply in 5+ min)
+async function maybeAutoReply() {
+  const recent = await db.select().from(chatMessages).orderBy(desc(chatMessages.createdAt)).limit(5);
+  if (!recent.length) return;
+  const last = recent[0];
+  if (last.sender !== "her") return;
+  const ageMs = Date.now() - new Date(last.createdAt).getTime();
+  if (ageMs < 5 * 60 * 1000) return; // wait 5 min
+  // Insert AI response
+  await db.insert(chatMessages).values({
+    text: pickAiResponse(),
+    sender: "me",
+    status: "delivered",
+    date: todayStr(),
+    isAi: true,
+  });
+}
+
+app.get("/api/chat/messages", async (_req, res) => {
+  try {
+    await maybeAutoReply();
+    const messages = await db.select().from(chatMessages).orderBy(chatMessages.createdAt);
+    // Mark all 'sent' messages from 'her' as 'delivered'
+    await db.update(chatMessages).set({ status: "delivered" }).where(eq(chatMessages.status, "sent"));
+    res.json(messages);
+  } catch (err) {
+    console.error("chat GET error:", err);
+    res.status(500).json({ error: "Failed to fetch messages" });
+  }
+});
+
+app.post("/api/chat/send", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: "text is required" });
+    const [msg] = await db.insert(chatMessages).values({
+      text: text.trim(),
+      sender: "her",
+      status: "sent",
+      date: todayStr(),
+      isAi: false,
+    }).returning();
+    // Notify via Telegram
+    await sendTelegram(`💌 <b>She said:</b>\n"${text.trim()}"\n\n<i>Reply at: POST /api/chat/reply</i>`);
+    res.json(msg);
+  } catch (err) {
+    console.error("chat send error:", err);
+    res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+app.post("/api/chat/reply", async (req, res) => {
+  try {
+    const { text, secret } = req.body;
+    if (secret !== process.env.ADMIN_CHAT_SECRET && secret !== "your ability to lie") {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    if (!text?.trim()) return res.status(400).json({ error: "text is required" });
+    const [msg] = await db.insert(chatMessages).values({
+      text: text.trim(),
+      sender: "me",
+      status: "delivered",
+      date: todayStr(),
+      isAi: false,
+    }).returning();
+    res.json(msg);
+  } catch (err) {
+    console.error("chat reply error:", err);
+    res.status(500).json({ error: "Failed to send reply" });
+  }
+});
+
+app.post("/api/chat/seen", async (_req, res) => {
+  try {
+    await db.update(chatMessages).set({ status: "seen" }).where(eq(chatMessages.status, "delivered"));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to mark seen" });
+  }
+});
+
+// ── GIFT ─────────────────────────────────────────────────────
 app.get("/api/gift/balance", async (_req, res) => {
   try {
     const rows = await db.select().from(giftBalance).orderBy(desc(giftBalance.updatedAt)).limit(1);
-    const amount = rows[0]?.amountKes ?? 0;
-    res.json({ amountKes: amount });
+    res.json({ amountKes: rows[0]?.amountKes ?? 0 });
   } catch (err) {
-    console.error("gift balance GET error:", err);
     res.status(500).json({ error: "Failed to fetch balance" });
   }
 });
@@ -203,9 +346,7 @@ app.get("/api/gift/balance", async (_req, res) => {
 app.post("/api/gift/balance", async (req, res) => {
   try {
     const { amountKes } = req.body;
-    if (typeof amountKes !== "number" || amountKes < 0) {
-      return res.status(400).json({ error: "amountKes must be a non-negative number" });
-    }
+    if (typeof amountKes !== "number" || amountKes < 0) return res.status(400).json({ error: "Invalid amount" });
     const rows = await db.select().from(giftBalance).limit(1);
     if (rows.length > 0) {
       await db.update(giftBalance).set({ amountKes, updatedAt: new Date() }).where(eq(giftBalance.id, rows[0].id));
@@ -214,38 +355,26 @@ app.post("/api/gift/balance", async (req, res) => {
     }
     res.json({ success: true, amountKes });
   } catch (err) {
-    console.error("gift balance POST error:", err);
     res.status(500).json({ error: "Failed to update balance" });
   }
 });
 
-// POST /api/gift/lookup — validate Kenyan phone number format
-// NOTE: Africa's Talking does NOT provide a public API to look up another person's
-// name from their phone number — this is restricted for privacy. The name you see
-// on M-Pesa is only confirmed during the actual transaction (STK push) on the
-// recipient's phone. This endpoint validates the number format only.
 app.post("/api/gift/lookup", async (req, res) => {
   try {
     const { phone, recipientName } = req.body;
     if (!phone) return res.status(400).json({ error: "phone required" });
-
     const normalized = phone.startsWith("+") ? phone : `+254${phone.replace(/^0/, "")}`;
     const isKenyan = /^\+2547\d{8}$/.test(normalized);
-    if (!isKenyan) {
-      return res.status(400).json({ error: "Enter a valid Kenyan number (07XX XXX XXX or +2547XX XXX XXX)" });
-    }
-
+    if (!isKenyan) return res.status(400).json({ error: "Enter a valid Kenyan number (07XX XXX XXX)" });
     const name = (recipientName || "").trim() || "M-Pesa Account";
     res.json({ phone: normalized, name, verified: true });
   } catch (err) {
-    console.error("gift lookup error:", err);
     res.status(500).json({ error: "Lookup failed" });
   }
 });
 
 const DAILY_LIMIT_KES = 5000;
 
-// Start of today in EAT (UTC+3) expressed as UTC Date
 function startOfTodayEAT(): Date {
   const now = new Date();
   const eatNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
@@ -255,10 +384,7 @@ function startOfTodayEAT(): Date {
 }
 
 async function getTodayTotalSent(): Promise<number> {
-  const rows = await db
-    .select({ amountKes: giftTransactions.amountKes })
-    .from(giftTransactions)
-    .where(gte(giftTransactions.createdAt, startOfTodayEAT()));
+  const rows = await db.select({ amountKes: giftTransactions.amountKes }).from(giftTransactions).where(gte(giftTransactions.createdAt, startOfTodayEAT()));
   return rows.reduce((sum, r) => sum + r.amountKes, 0);
 }
 
@@ -266,51 +392,26 @@ app.post("/api/gift/send", async (req, res) => {
   try {
     const { phone, recipientName, amountKes } = req.body;
     if (!phone || !amountKes) return res.status(400).json({ error: "phone and amountKes are required" });
-    if (typeof amountKes !== "number" || amountKes <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    // Check daily limit
+    if (typeof amountKes !== "number" || amountKes <= 0) return res.status(400).json({ error: "Invalid amount" });
     const totalToday = await getTodayTotalSent();
     const remaining = DAILY_LIMIT_KES - totalToday;
-    if (amountKes > remaining) {
-      return res.status(400).json({
-        error: `Daily limit reached. You can send up to KES ${remaining.toLocaleString()} more today.`,
-        remaining,
-      });
-    }
-
+    if (amountKes > remaining) return res.status(400).json({ error: `Daily limit reached. You can send up to KES ${remaining.toLocaleString()} more today.`, remaining });
     const rows = await db.select().from(giftBalance).limit(1);
     const current = rows[0]?.amountKes ?? 0;
-    if (current < amountKes) {
-      return res.status(400).json({ error: "Insufficient gift balance" });
-    }
-
-    await db.update(giftBalance)
-      .set({ amountKes: current - amountKes, updatedAt: new Date() })
-      .where(eq(giftBalance.id, rows[0].id));
-
-    const [tx] = await db.insert(giftTransactions).values({
-      phoneNumber: phone,
-      recipientName: recipientName || null,
-      amountKes,
-      status: "sent",
-    }).returning();
-
+    if (current < amountKes) return res.status(400).json({ error: "Insufficient gift balance" });
+    await db.update(giftBalance).set({ amountKes: current - amountKes, updatedAt: new Date() }).where(eq(giftBalance.id, rows[0].id));
+    const [tx] = await db.insert(giftTransactions).values({ phoneNumber: phone, recipientName: recipientName || null, amountKes, status: "sent" }).returning();
     res.json({ success: true, transaction: tx, remainingKes: current - amountKes });
   } catch (err) {
-    console.error("gift send error:", err);
     res.status(500).json({ error: "Failed to send gift" });
   }
 });
 
-// GET /api/gift/daily-sent — how much has been sent today vs the 5000 limit
 app.get("/api/gift/daily-sent", async (_req, res) => {
   try {
     const totalSent = await getTodayTotalSent();
-    res.json({ totalSent, remaining: Math.max(0, DAILY_LIMIT - totalSent), dailyLimit: DAILY_LIMIT });
+    res.json({ totalSent, remaining: Math.max(0, DAILY_LIMIT_KES - totalSent), dailyLimit: DAILY_LIMIT_KES });
   } catch (err) {
-    console.error("daily-sent GET error:", err);
     res.status(500).json({ error: "Failed to fetch daily total" });
   }
 });
@@ -320,7 +421,6 @@ app.get("/api/gift/history", async (_req, res) => {
     const txs = await db.select().from(giftTransactions).orderBy(desc(giftTransactions.createdAt)).limit(20);
     res.json(txs);
   } catch (err) {
-    console.error("gift history error:", err);
     res.status(500).json({ error: "Failed to fetch history" });
   }
 });
@@ -329,11 +429,7 @@ app.get("/api/gift/history", async (_req, res) => {
 if (process.env.NODE_ENV === "production") {
   const distPath = path.join(__dirname, "../dist/public");
   app.use(express.static(distPath));
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-  });
+  app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

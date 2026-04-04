@@ -9,6 +9,7 @@ import WelcomeNote from "@/components/WelcomeNote";
 import Navigation from "@/components/Navigation";
 import AudioPlayer from "@/components/AudioPlayer";
 import SplashScreen from "@/components/SplashScreen";
+import ChatBox from "@/components/ChatBox";
 import LandingPage from "@/pages/LandingPage";
 import OurStoryPage from "@/pages/OurStoryPage";
 import TheJourneyPage from "@/pages/TheJourneyPage";
@@ -42,6 +43,7 @@ const AuthenticatedApp = (): JSX.Element => {
       <WelcomeNote />
       <Navigation />
       <AudioPlayer />
+      <ChatBox />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/our-story" element={<OurStoryPage />} />
