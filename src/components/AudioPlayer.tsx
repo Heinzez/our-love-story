@@ -8,6 +8,8 @@ const AudioPlayer = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(30);
   const [isExpanded, setIsExpanded] = useState(false);
+  const duckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDuckedRef = useRef(false);
 
   useEffect(() => {
     const audio = new Audio("/my-lover.mp3");
@@ -41,13 +43,37 @@ const AudioPlayer = () => {
     }
   }, [volume, isMuted]);
 
+  // Listen for chat-chime event to duck music temporarily
+  useEffect(() => {
+    const handleDuck = () => {
+      const audio = audioRef.current;
+      if (!audio || isMuted || !isPlaying) return;
+
+      // Cancel any pending restore
+      if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
+
+      if (!isDuckedRef.current) {
+        isDuckedRef.current = true;
+        audio.volume = Math.max(0, (volume / 100) * 0.1); // duck to 10%
+      }
+
+      // Restore after chime finishes (~2.5s)
+      duckTimerRef.current = setTimeout(() => {
+        if (audio && !isMuted) {
+          audio.volume = volume / 100;
+        }
+        isDuckedRef.current = false;
+      }, 2500);
+    };
+
+    window.addEventListener("chat-chime", handleDuck);
+    return () => window.removeEventListener("chat-chime", handleDuck);
+  }, [volume, isMuted, isPlaying]);
+
   const togglePlay = () => {
     if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
+    if (isPlaying) audioRef.current.pause();
+    else audioRef.current.play();
   };
 
   const toggleMute = () => setIsMuted((m) => !m);

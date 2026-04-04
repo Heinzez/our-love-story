@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircleHeart, X, Send, ChevronDown, Heart, Loader2, ShieldCheck } from "lucide-react";
+import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useSite } from "@/context/SiteContext";
 import type { ChatMessage } from "../../shared/schema";
 
+// ── Status display ────────────────────────────────────────────
 const STATUS_ICONS: Record<string, string> = {
   sent: "✓",
   delivered: "✓✓",
@@ -34,6 +35,38 @@ function formatTime(ts: string) {
   return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+// ── Soft chime via Web Audio API ─────────────────────────────
+function playChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    // Dispatch event so AudioPlayer can duck volume
+    window.dispatchEvent(new CustomEvent("chat-chime"));
+
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      const start = ctx.currentTime + i * 0.18;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.22, start + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.7);
+      osc.start(start);
+      osc.stop(start + 0.7);
+    });
+
+    setTimeout(() => { try { ctx.close(); } catch (_) {} }, 2500);
+  } catch (_) {
+    // Audio not available — ignore
+  }
+}
+
 const ADMIN_SECRET = "your ability to lie";
 
 export default function ChatBox() {
@@ -42,40 +75,72 @@ export default function ChatBox() {
   const [input, setInput] = useState("");
   const [unread, setUnread] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prevMsgCount = useRef(0);
+  const prevMsgIds = useRef<Set<string>>(new Set());
   const qc = useQueryClient();
 
   const { data: messages = [], isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/messages"],
-    refetchInterval: open ? 4000 : 15000,
+    refetchInterval: open ? 4000 : 10000,
   });
 
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {
       const endpoint = isAdmin ? "/api/chat/reply" : "/api/chat/send";
-      const body = isAdmin
-        ? { text, secret: ADMIN_SECRET }
-        : { text };
-      const res = await apiRequest(endpoint, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      const body = isAdmin ? { text, secret: ADMIN_SECRET } : { text };
+      const res = await apiRequest(endpoint, { method: "POST", body: JSON.stringify(body) });
       return res.json();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/chat/messages"] }),
   });
 
+  // Mark seen when chat opens — different logic for admin vs her
   useEffect(() => {
     if (!open) return;
     setUnread(0);
-    fetch("/api/chat/seen", { method: "POST" }).catch(() => {});
-  }, [open]);
+    const markSender = isAdmin ? "her" : "me";
+    fetch("/api/chat/seen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markSender }),
+    }).catch(() => {});
+  }, [open, isAdmin]);
 
+  // Detect new incoming messages → update unread badge + play chime
+  useEffect(() => {
+    if (!messages.length) return;
+
+    const currentIds = new Set(messages.map(m => m.id));
+
+    if (prevMsgIds.current.size > 0) {
+      // Find truly new messages since last poll
+      const newMsgs = messages.filter(m => !prevMsgIds.current.has(m.id));
+
+      // From her perspective: chime on new messages from "me" (him)
+      // From admin perspective: no chime (admin is the sender)
+      const incomingForViewer = newMsgs.filter(m =>
+        isAdmin ? m.sender === "her" : m.sender === "me"
+      );
+
+      if (incomingForViewer.length > 0 && !open) {
+        if (!isAdmin) playChime(); // chime only for her when window is closed
+      }
+    }
+
+    prevMsgIds.current = currentIds;
+
+    // Unread badge: messages from the other side that aren't "seen" yet
+    if (!open) {
+      const unreadSender = isAdmin ? "her" : "me";
+      const count = messages.filter(m => m.sender === unreadSender && m.status !== "seen").length;
+      setUnread(count);
+    }
+  }, [messages, open, isAdmin]);
+
+  // Scroll to bottom on new messages when open
   useEffect(() => {
     if (open) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    } else {
-      const myNew = messages.filter(m => m.sender === "me" && m.status !== "seen");
-      setUnread(myNew.length);
     }
   }, [messages, open]);
 
@@ -103,7 +168,7 @@ export default function ChatBox() {
         <MessageCircleHeart className="w-6 h-6 text-white" />
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-primary text-[11px] font-bold flex items-center justify-center shadow">
-            {unread}
+            {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
@@ -172,9 +237,9 @@ export default function ChatBox() {
               </div>
 
               {msgs.map((m) => {
-                // From her perspective: 'her' = sent by her (right), 'me' = from him (left)
-                // From admin perspective: 'me' = sent by admin (right), 'her' = from her (left)
+                // isMine = message sent by the current viewer
                 const isMine = isAdmin ? m.sender === "me" : m.sender === "her";
+                const isSeenByOther = m.status === "seen";
 
                 return (
                   <div
@@ -194,7 +259,7 @@ export default function ChatBox() {
                       <div className={`flex items-center gap-1 mt-1 justify-end ${isMine ? "text-white/50" : "text-muted-foreground/50"}`}>
                         <span className="text-[10px]">{formatTime(m.createdAt as unknown as string)}</span>
                         {isMine && (
-                          <span className={`text-[10px] ${m.status === "seen" ? "text-blue-300" : ""}`}>
+                          <span className={`text-[10px] font-medium ${isSeenByOther ? "text-blue-300" : ""}`}>
                             {STATUS_ICONS[m.status] || "✓"}
                           </span>
                         )}
@@ -213,11 +278,6 @@ export default function ChatBox() {
           className="shrink-0 px-3 py-3 border-t border-border/40 flex items-end gap-2"
           style={{ background: "hsl(var(--background))" }}
         >
-          {isAdmin && (
-            <div className="absolute bottom-16 left-3 text-[10px] text-primary/40 font-body">
-              replying as you ↑
-            </div>
-          )}
           <textarea
             data-testid="input-chat-message"
             value={input}

@@ -321,14 +321,14 @@ app.delete("/api/photos/:id", async (req, res) => {
 
 // ── CHAT ──────────────────────────────────────────────────────
 
-// Check if an AI auto-reply is needed (last message from 'her', no reply in 5+ min)
+// Check if an AI auto-reply is needed (last message from 'her', no reply in 3+ min)
 async function maybeAutoReply() {
   const recent = await db.select().from(chatMessages).orderBy(desc(chatMessages.createdAt)).limit(5);
   if (!recent.length) return;
   const last = recent[0];
   if (last.sender !== "her") return;
   const ageMs = Date.now() - new Date(last.createdAt).getTime();
-  if (ageMs < 5 * 60 * 1000) return; // wait 5 min
+  if (ageMs < 3 * 60 * 1000) return; // wait 3 min
   // Insert AI response
   await db.insert(chatMessages).values({
     text: pickAiResponse(),
@@ -379,6 +379,10 @@ app.post("/api/chat/reply", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
     if (!text?.trim()) return res.status(400).json({ error: "text is required" });
+    // Mark all her delivered messages as seen (admin is replying = he read them)
+    await db.update(chatMessages)
+      .set({ status: "seen" })
+      .where(eq(chatMessages.sender, "her"));
     const [msg] = await db.insert(chatMessages).values({
       text: text.trim(),
       sender: "me",
@@ -393,9 +397,13 @@ app.post("/api/chat/reply", async (req, res) => {
   }
 });
 
-app.post("/api/chat/seen", async (_req, res) => {
+// markSender: 'her' = admin marking her messages seen | 'me' = she marking his messages seen
+app.post("/api/chat/seen", async (req, res) => {
   try {
-    await db.update(chatMessages).set({ status: "seen" }).where(eq(chatMessages.status, "delivered"));
+    const markSender = req.body?.markSender === "me" ? "me" : "her";
+    await db.update(chatMessages)
+      .set({ status: "seen" })
+      .where(eq(chatMessages.sender, markSender));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to mark seen" });
