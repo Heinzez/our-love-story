@@ -364,7 +364,7 @@ app.post("/api/chat/send", async (req, res) => {
       isAi: false,
     }).returning();
     // Notify via Telegram
-    await sendTelegram(`💌 <b>She said:</b>\n"${text.trim()}"\n\n<i>Reply at: POST /api/chat/reply</i>`);
+    await sendTelegram(`💌 <b>She said:</b>\n"${text.trim()}"\n\n<i>Reply with: /reply your message here</i>`);
     res.json(msg);
   } catch (err) {
     console.error("chat send error:", err);
