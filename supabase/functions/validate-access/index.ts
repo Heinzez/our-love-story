@@ -43,7 +43,14 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ authenticated: true, role: data.role }), {
+    let adminToken: string | null = null;
+    if (data.role === 'admin') {
+      adminToken = crypto.randomUUID() + '-' + crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 8).toISOString(); // 8h
+      await supabase.from('admin_sessions').insert({ token: adminToken, expires_at: expiresAt });
+    }
+
+    return new Response(JSON.stringify({ authenticated: true, role: data.role, adminToken }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
