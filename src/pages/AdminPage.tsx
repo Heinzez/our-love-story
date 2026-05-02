@@ -5,6 +5,7 @@ import {
   Loader2, Check, ChevronDown, ChevronUp, Info,
 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
+import AdminPageEditor from "@/components/AdminPageEditor";
 
 const post = async (url: string, body: unknown) => {
   const res = await fetch(url, {
@@ -106,6 +107,9 @@ const AdminPage = () => {
         </div>
 
         <div className="space-y-4">
+
+          {/* Page editor (premiere dates + image uploads) */}
+          <AdminPageEditor />
 
           {/* Gift Settings */}
           <Section title="Gift Page Controls" icon={Gift}>
