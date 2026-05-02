@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.validate-access]
 verify_jwt = false
+
+[functions.admin-mutate]
+verify_jwt = false

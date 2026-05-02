@@ -3,22 +3,27 @@ import { useSite } from "@/context/SiteContext";
 import { Calendar, Mail, Lock } from "lucide-react";
 
 interface PremierePageProps {
+  pageKey: string;
   title: string;
   emoji: string;
-  premiereDate: Date;
+  premiereDate: Date; // fallback default
   description: string;
   children?: React.ReactNode;
 }
 
-const PremierePage = ({ title, emoji, premiereDate, description, children }: PremierePageProps) => {
-  const { isAdmin, subscribedEmail, setSubscribedEmail } = useSite();
+const PremierePage = ({ pageKey, title, emoji, premiereDate, description, children }: PremierePageProps) => {
+  const { isAdmin, subscribedEmail, setSubscribedEmail, pageSettings, pageImages } = useSite();
+  const setting = pageSettings[pageKey];
+  const effectiveDate = setting?.premiere_date ? new Date(setting.premiere_date) : premiereDate;
+  const effectiveDesc = setting?.description ?? description;
+  const images = pageImages[pageKey] ?? [];
   const [emailInput, setEmailInput] = useState("");
   const [backupEmail, setBackupEmail] = useState("");
   const [showBackup, setShowBackup] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const now = new Date();
-  const isLive = now >= premiereDate;
+  const isLive = now >= effectiveDate;
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,22 +47,29 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
         <div className="max-w-4xl mx-auto">
           <div className="glass-card rounded-2xl p-8 mb-6">
             <h1 className="text-4xl font-display gradient-text mb-2">{emoji} {title}</h1>
-            <p className="text-muted-foreground font-script text-xl mb-4">{description}</p>
+            <p className="text-muted-foreground font-script text-xl mb-4">{effectiveDesc}</p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <Calendar className="w-4 h-4" />
-              <span>Premieres: {formatDate(premiereDate)}</span>
+              <span>Premieres: {formatDate(effectiveDate)}</span>
               <span className={`px-2 py-0.5 rounded-full text-xs ${isLive ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"}`}>
                 {isLive ? "LIVE" : "Scheduled"}
               </span>
             </div>
           </div>
           <div className="glass-card rounded-2xl p-8">
-            <h2 className="text-xl font-display text-foreground mb-4">Admin Panel</h2>
-            <p className="text-muted-foreground mb-4">This section will be editable when the page goes live. You can add images, text, and more here.</p>
-            <div className="border-2 border-dashed border-border rounded-xl p-12 text-center text-muted-foreground">
-              <p className="text-lg">📸 Drop content here when ready</p>
-              <p className="text-sm mt-2">Images, stories, and memories will go here</p>
-            </div>
+            <h2 className="text-xl font-display text-foreground mb-4">Uploaded Images</h2>
+            {images.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No images yet. Use the <a href="/admin" className="text-primary underline">Admin editor</a> to upload.</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {images.map((img) => (
+                  <figure key={img.id} className="rounded-xl overflow-hidden border border-border/40 bg-muted/20">
+                    <img src={img.publicUrl} alt={img.caption || title} className="w-full h-40 object-cover" loading="lazy" />
+                    {img.caption && <figcaption className="text-xs text-muted-foreground p-2">{img.caption}</figcaption>}
+                  </figure>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -69,6 +81,16 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
       <div className="min-h-screen pt-24 pb-12 px-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-display gradient-text mb-8 text-center">{emoji} {title}</h1>
+        {images.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
+            {images.map((img) => (
+              <figure key={img.id} className="rounded-xl overflow-hidden border border-border/40 bg-muted/20">
+                <img src={img.publicUrl} alt={img.caption || title} className="w-full h-48 object-cover" loading="lazy" />
+                {img.caption && <figcaption className="text-xs text-muted-foreground p-2 text-center">{img.caption}</figcaption>}
+              </figure>
+            ))}
+          </div>
+        )}
           {children}
           <div className="text-center mt-12 text-primary font-display text-sm tracking-wide">
             Mr.Mwendwa — always yours ❤️💍
@@ -84,11 +106,11 @@ const PremierePage = ({ title, emoji, premiereDate, description, children }: Pre
         <div className="glass-card rounded-2xl p-10 animate-fade-in-up">
           <div className="text-6xl mb-6">{emoji}</div>
           <h1 className="text-3xl font-display gradient-text mb-3">{title}</h1>
-          <p className="text-muted-foreground font-script text-xl mb-6">{description}</p>
+          <p className="text-muted-foreground font-script text-xl mb-6">{effectiveDesc}</p>
           
           <div className="flex items-center justify-center gap-2 mb-8 text-primary">
             <Lock className="w-5 h-5" />
-            <span className="font-display text-lg">Premieres {formatDate(premiereDate)}</span>
+            <span className="font-display text-lg">Premieres {formatDate(effectiveDate)}</span>
           </div>
 
           {subscribedEmail ? (

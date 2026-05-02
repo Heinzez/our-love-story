@@ -35,6 +35,24 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          token?: string
+        }
+        Relationships: []
+      }
       email_subscribers: {
         Row: {
           backup_email: string | null
@@ -53,6 +71,54 @@ export type Database = {
           id?: string
           primary_email?: string
           subscribed_at?: string
+        }
+        Relationships: []
+      }
+      page_images: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          image_path: string
+          page_key: string
+          sort_order: number
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          image_path: string
+          page_key: string
+          sort_order?: number
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          image_path?: string
+          page_key?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      page_settings: {
+        Row: {
+          description: string | null
+          page_key: string
+          premiere_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          description?: string | null
+          page_key: string
+          premiere_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          description?: string | null
+          page_key?: string
+          premiere_date?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

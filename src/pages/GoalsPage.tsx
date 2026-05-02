@@ -50,6 +50,7 @@ const GoalsPage = () => {
   const { isAdmin } = useSite();
   if (!isAdmin) return (
     <PremierePage
+      pageKey="goals"
       title="Goals & Dreams"
       emoji="⭐"
       premiereDate={new Date("2026-11-20")}
