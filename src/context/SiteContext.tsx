@@ -7,20 +7,40 @@ interface SavedNote {
   date: string;
 }
 
+export interface PageSetting {
+  page_key: string;
+  premiere_date: string | null;
+  description: string | null;
+}
+
+export interface PageImage {
+  id: string;
+  page_key: string;
+  image_path: string;
+  caption: string | null;
+  sort_order: number;
+  publicUrl: string;
+}
+
 interface SiteContextType {
   isAdmin: boolean;
   isAuthenticated: boolean;
+  adminToken: string | null;
   subscribedEmail: string | null;
   backupEmail: string | null;
   savedNotes: SavedNote[];
+  pageSettings: Record<string, PageSetting>;
+  pageImages: Record<string, PageImage[]>;
   showWelcomeNote: boolean;
   hasNewNote: boolean;
   setIsAdmin: (v: boolean) => void;
   setIsAuthenticated: (v: boolean) => void;
+  setAdminToken: (t: string | null) => void;
   setSubscribedEmail: (email: string, backup?: string) => void;
   saveNote: (note: SavedNote) => void;
   setShowWelcomeNote: (v: boolean) => void;
   clearNewNote: () => void;
+  refreshPageData: () => Promise<void>;
 }
 
 const SiteContext = createContext<SiteContextType | null>(null);
@@ -34,11 +54,50 @@ export const useSite = () => {
 export const SiteProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminToken, setAdminTokenState] = useState<string | null>(null);
   const [showWelcomeNote, setShowWelcomeNote] = useState(false);
   const [hasNewNote, setHasNewNote] = useState(false);
   const [subscribedEmail, setSubscribedEmailState] = useState<string | null>(null);
   const [backupEmail, setBackupEmailState] = useState<string | null>(null);
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>([]);
+  const [pageSettings, setPageSettings] = useState<Record<string, PageSetting>>({});
+  const [pageImages, setPageImages] = useState<Record<string, PageImage[]>>({});
+
+  const refreshPageData = async () => {
+    const [{ data: settings }, { data: images }] = await Promise.all([
+      supabase.from("page_settings").select("page_key, premiere_date, description"),
+      supabase.from("page_images").select("id, page_key, image_path, caption, sort_order").order("sort_order", { ascending: true }),
+    ]);
+    if (settings) {
+      const map: Record<string, PageSetting> = {};
+      for (const s of settings as PageSetting[]) map[s.page_key] = s;
+      setPageSettings(map);
+    }
+    if (images) {
+      const grouped: Record<string, PageImage[]> = {};
+      for (const img of images as Omit<PageImage, "publicUrl">[]) {
+        const { data: pub } = supabase.storage.from("premiere-media").getPublicUrl(img.image_path);
+        const enriched: PageImage = { ...img, publicUrl: pub.publicUrl };
+        (grouped[img.page_key] ||= []).push(enriched);
+      }
+      setPageImages(grouped);
+    }
+  };
+
+  useEffect(() => {
+    refreshPageData();
+  }, []);
+
+  const setAdminToken = (t: string | null) => {
+    setAdminTokenState(t);
+    if (t) sessionStorage.setItem("queen-admin-token", t);
+    else sessionStorage.removeItem("queen-admin-token");
+  };
+
+  useEffect(() => {
+    const t = sessionStorage.getItem("queen-admin-token");
+    if (t) setAdminTokenState(t);
+  }, []);
 
   useEffect(() => {
     setSubscribedEmailState(localStorage.getItem("queen-email"));
@@ -115,9 +174,11 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <SiteContext.Provider value={{
-      isAdmin, isAuthenticated, subscribedEmail, backupEmail, savedNotes, showWelcomeNote, hasNewNote,
-      setIsAdmin, setIsAuthenticated: handleSetAuthenticated, setSubscribedEmail: handleSetEmail,
-      saveNote, setShowWelcomeNote, clearNewNote,
+      isAdmin, isAuthenticated, adminToken, subscribedEmail, backupEmail, savedNotes,
+      pageSettings, pageImages, showWelcomeNote, hasNewNote,
+      setIsAdmin, setIsAuthenticated: handleSetAuthenticated, setAdminToken,
+      setSubscribedEmail: handleSetEmail,
+      saveNote, setShowWelcomeNote, clearNewNote, refreshPageData,
     }}>
       {children}
     </SiteContext.Provider>

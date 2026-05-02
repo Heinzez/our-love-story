@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lock, ArrowRight, CircleAlert as AlertCircle } from "lucide-react";
 
 const AccessGate = () => {
-  const { setIsAdmin, setIsAuthenticated } = useSite();
+  const { setIsAdmin, setIsAuthenticated, setAdminToken } = useSite();
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,6 +22,7 @@ const AccessGate = () => {
 
       if (data?.authenticated) {
         setIsAdmin(data.role === 'admin');
+        setAdminToken(data.adminToken ?? null);
         setIsAuthenticated(true);
       } else {
         setError("Incorrect answer. Please try again.");
