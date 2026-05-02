@@ -45,6 +45,7 @@ const OurStoryPage = () => {
   const { isAdmin } = useSite();
   if (!isAdmin) return (
     <PremierePage
+      pageKey="our-story"
       title="Our Story"
       emoji="📖"
       premiereDate={new Date("2026-08-14")}
