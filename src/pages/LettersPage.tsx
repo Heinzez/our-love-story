@@ -1,4 +1,6 @@
 import { Mail, Heart, Sparkles } from "lucide-react";
+import { useSite } from "@/context/SiteContext";
+import PremierePage from "@/components/PremierePage";
 
 const letters = [
   {
@@ -48,7 +50,7 @@ And I want to keep writing you letters — for as long as you'll have me.`,
   },
 ];
 
-const LettersPage = () => (
+const LettersContent = () => (
   <div className="min-h-screen pt-24 pb-20 px-4">
     <div className="max-w-2xl mx-auto">
 
@@ -110,5 +112,19 @@ const LettersPage = () => (
     </div>
   </div>
 );
+
+const LettersPage = () => {
+  const { isAdmin } = useSite();
+  if (!isAdmin) return (
+    <PremierePage
+      pageKey="letters"
+      title="My Letters To You"
+      emoji="💌"
+      premiereDate={new Date("2026-10-20")}
+      description="Words I wrote at 3am when missing you felt like a superpower."
+    />
+  );
+  return <LettersContent />;
+};
 
 export default LettersPage;
