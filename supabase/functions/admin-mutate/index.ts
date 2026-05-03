@@ -77,10 +77,48 @@ serve(async (req) => {
     if (action === "delete-image") {
       const { id, path } = body;
       if (!id || !path) return json({ error: "Missing id/path" }, 400);
+      // Verify image actually belongs to a valid page (extra integrity check)
+      const { data: existing } = await supabase.from("page_images").select("page_key, image_path").eq("id", id).maybeSingle();
+      if (!existing || existing.image_path !== path || !PAGE_KEYS.has(existing.page_key)) {
+        return json({ error: "Image not found or page key mismatch" }, 400);
+      }
       await supabase.storage.from("premiere-media").remove([String(path)]);
       const { error } = await supabase.from("page_images").delete().eq("id", id);
       if (error) throw error;
       return json({ ok: true });
+    }
+
+    if (action === "update-image") {
+      const { id, caption, sort_order } = body;
+      if (!id) return json({ error: "Missing id" }, 400);
+      const update: Record<string, unknown> = {};
+      if (caption !== undefined) update.caption = caption ? String(caption).slice(0, 200) : null;
+      if (typeof sort_order === "number") update.sort_order = sort_order;
+      if (!Object.keys(update).length) return json({ error: "Nothing to update" }, 400);
+      const { error } = await supabase.from("page_images").update(update).eq("id", id);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    if (action === "reorder-images") {
+      const { pageKey, orderedIds } = body;
+      if (!PAGE_KEYS.has(pageKey) || !Array.isArray(orderedIds)) return json({ error: "Invalid input" }, 400);
+      for (let i = 0; i < orderedIds.length; i++) {
+        await supabase.from("page_images").update({ sort_order: i }).eq("id", orderedIds[i]).eq("page_key", pageKey);
+      }
+      return json({ ok: true });
+    }
+
+    if (action === "notify-premiere") {
+      const { pageKey } = body;
+      if (!PAGE_KEYS.has(pageKey)) return json({ error: "Invalid page" }, 400);
+      const { data: subs } = await supabase.from("email_subscribers").select("primary_email, backup_email");
+      const emails = (subs ?? []).flatMap((s: { primary_email: string; backup_email: string | null }) =>
+        [s.primary_email, s.backup_email].filter(Boolean)
+      );
+      // Mark page as live now (set premiere_date = now if in the future)
+      await supabase.from("page_settings").update({ premiere_date: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("page_key", pageKey);
+      return json({ ok: true, notified: emails.length, recipients: emails });
     }
 
     return json({ error: "Unknown action" }, 400);

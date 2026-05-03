@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSite } from "@/context/SiteContext";
 import { Calendar, Mail, Lock } from "lucide-react";
 
@@ -24,6 +24,19 @@ const PremierePage = ({ pageKey, title, emoji, premiereDate, description, childr
 
   const now = new Date();
   const isLive = now >= effectiveDate;
+
+  // Countdown timer
+  const [timeLeft, setTimeLeft] = useState(() => effectiveDate.getTime() - Date.now());
+  useEffect(() => {
+    if (isLive) return;
+    const id = setInterval(() => setTimeLeft(effectiveDate.getTime() - Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [effectiveDate, isLive]);
+
+  const days = Math.max(0, Math.floor(timeLeft / 86400000));
+  const hours = Math.max(0, Math.floor((timeLeft / 3600000) % 24));
+  const minutes = Math.max(0, Math.floor((timeLeft / 60000) % 60));
+  const seconds = Math.max(0, Math.floor((timeLeft / 1000) % 60));
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +125,22 @@ const PremierePage = ({ pageKey, title, emoji, premiereDate, description, childr
             <Lock className="w-5 h-5" />
             <span className="font-display text-lg">Premieres {formatDate(effectiveDate)}</span>
           </div>
+
+          {!isLive && (
+            <div className="grid grid-cols-4 gap-2 mb-8">
+              {[
+                { v: days, l: "Days" },
+                { v: hours, l: "Hours" },
+                { v: minutes, l: "Min" },
+                { v: seconds, l: "Sec" },
+              ].map((u) => (
+                <div key={u.l} className="rounded-xl py-3 px-1 bg-muted/30 border border-primary/20">
+                  <div className="font-display text-2xl gradient-text leading-none">{String(u.v).padStart(2, "0")}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">{u.l}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {subscribedEmail ? (
             <div className="bg-muted/30 rounded-xl p-4 animate-fade-in-up">

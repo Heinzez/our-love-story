@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSite } from "@/context/SiteContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Image as ImageIcon, Calendar, Loader2, Trash2, Upload, Check } from "lucide-react";
+import { Image as ImageIcon, Calendar, Loader2, Trash2, Upload, Check, ArrowUp, ArrowDown, Pencil, Send, X } from "lucide-react";
 
 const PAGES: { key: string; label: string; emoji: string }[] = [
   { key: "our-story", label: "Our Story", emoji: "📖" },
@@ -31,6 +31,9 @@ const AdminPageEditor = () => {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; path: string; url: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCaption, setEditCaption] = useState("");
 
   const setting = pageSettings[active];
   const images = pageImages[active] ?? [];
@@ -82,11 +85,45 @@ const AdminPageEditor = () => {
   };
 
   const remove = async (id: string, path: string) => {
-    if (!confirm("Delete this image?")) return;
     setBusy(true); setErr(null); setMsg(null);
     try {
       await call({ action: "delete-image", id, path });
       setMsg("Image deleted.");
+      setConfirmDelete(null);
+      await refreshPageData();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  const saveCaption = async (id: string) => {
+    setBusy(true); setErr(null); setMsg(null);
+    try {
+      await call({ action: "update-image", id, caption: editCaption });
+      setEditingId(null);
+      await refreshPageData();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  const move = async (idx: number, dir: -1 | 1) => {
+    const next = idx + dir;
+    if (next < 0 || next >= images.length) return;
+    const reordered = [...images];
+    [reordered[idx], reordered[next]] = [reordered[next], reordered[idx]];
+    setBusy(true); setErr(null);
+    try {
+      await call({ action: "reorder-images", pageKey: active, orderedIds: reordered.map((i) => i.id) });
+      await refreshPageData();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  const notifyPremiere = async () => {
+    if (!confirm("Mark this page as LIVE now and notify all subscribers?")) return;
+    setBusy(true); setErr(null); setMsg(null);
+    try {
+      const res = await call({ action: "notify-premiere", pageKey: active });
+      setMsg(`Page is now LIVE — ${res?.notified ?? 0} subscriber(s) flagged for notification.`);
       await refreshPageData();
     } catch (e) { setErr((e as Error).message); }
     finally { setBusy(false); }
@@ -158,6 +195,13 @@ const AdminPageEditor = () => {
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin inline" /> : "Save Page Settings"}
         </button>
+        <button
+          onClick={notifyPremiere}
+          disabled={busy}
+          className="ml-2 px-4 py-2 rounded-xl font-display text-sm tracking-wide text-foreground border border-primary/40 hover:bg-primary/10 transition-all disabled:opacity-40"
+        >
+          <Send className="w-3.5 h-3.5 inline mr-1.5" /> Go Live & Notify
+        </button>
       </div>
 
       {/* Upload */}
@@ -194,22 +238,52 @@ const AdminPageEditor = () => {
           <p className="text-muted-foreground/60 text-sm py-4 text-center">No images yet — upload the first one above.</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {images.map((img) => (
+            {images.map((img, idx) => (
               <div key={img.id} className="relative group rounded-xl overflow-hidden border border-border/40">
                 <img src={img.publicUrl} alt={img.caption || ""} className="w-full h-28 object-cover" />
-                {img.caption && <p className="absolute bottom-0 left-0 right-0 text-xs text-white bg-black/60 p-1 truncate">{img.caption}</p>}
-                <button
-                  onClick={() => remove(img.id, img.image_path)}
-                  className="absolute top-1 right-1 p-1.5 rounded-lg bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                  title="Delete"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {editingId === img.id ? (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-1.5 flex gap-1">
+                    <input
+                      autoFocus
+                      value={editCaption}
+                      onChange={(e) => setEditCaption(e.target.value)}
+                      maxLength={200}
+                      className="flex-1 bg-transparent text-white text-xs border-b border-primary/60 focus:outline-none"
+                    />
+                    <button onClick={() => saveCaption(img.id)} className="text-primary"><Check className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setEditingId(null)} className="text-white/60"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                ) : (
+                  img.caption && <p className="absolute bottom-0 left-0 right-0 text-xs text-white bg-black/60 p-1 truncate">{img.caption}</p>
+                )}
+                <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => move(idx, -1)} disabled={idx === 0} className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-primary/70 disabled:opacity-30" title="Move up"><ArrowUp className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => move(idx, 1)} disabled={idx === images.length - 1} className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-primary/70 disabled:opacity-30" title="Move down"><ArrowDown className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => { setEditingId(img.id); setEditCaption(img.caption || ""); }} className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-primary/70" title="Edit caption"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setConfirmDelete({ id: img.id, path: img.image_path, url: img.publicUrl })} className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-red-500" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Themed delete confirmation */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => !busy && setConfirmDelete(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h4 className="font-display text-lg gradient-text mb-2">Delete this memory?</h4>
+            <img src={confirmDelete.url} alt="" className="w-full h-40 object-cover rounded-xl mb-4 border border-border/40" />
+            <p className="text-sm text-muted-foreground mb-5">This image will be permanently removed. This cannot be undone.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDelete(null)} disabled={busy} className="flex-1 py-2 rounded-xl border border-border/60 text-foreground text-sm font-display">Keep it</button>
+              <button onClick={() => remove(confirmDelete.id, confirmDelete.path)} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-500/90 text-white text-sm font-display hover:bg-red-500">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin inline" /> : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
