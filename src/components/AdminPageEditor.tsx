@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Image as ImageIcon, Calendar, Loader2, Trash2, Upload, Check, ArrowUp, ArrowDown, Pencil, Send, X } from "lucide-react";
 
 const PAGES: { key: string; label: string; emoji: string }[] = [
+  { key: "landing", label: "Home Gallery", emoji: "🏠" },
   { key: "our-story", label: "Our Story", emoji: "📖" },
   { key: "the-journey", label: "The Journey", emoji: "🗺️" },
   { key: "laughs", label: "Laughs", emoji: "😂" },
