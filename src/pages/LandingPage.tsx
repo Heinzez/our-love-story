@@ -237,10 +237,6 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    if (!adminToken) {
-      setError("Only the admin can add photos here.");
-      return;
-    }
     setUploading(true);
     setError(null);
     for (const file of Array.from(files)) {
@@ -254,7 +250,7 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
             fileName: file.name,
             fileBase64: base64,
           },
-          headers: { "x-admin-token": adminToken },
+          headers: adminToken ? { "x-admin-token": adminToken } : undefined,
         });
         if (error) throw new Error(error.message);
         if (data?.error) throw new Error(data.error);
@@ -285,7 +281,7 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
         <button
           data-testid="button-photo-add"
           onClick={() => fileRef.current?.click()}
-          disabled={uploading || !adminToken}
+          disabled={uploading}
           className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 text-primary/60 hover:text-primary transition-all duration-300 active:scale-95 disabled:opacity-50"
           style={{ width: CARD_W, height: CARD_H }}
         >
@@ -296,7 +292,7 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
                   <Plus className="w-5 h-5" />
                 </div>
                 <span className="text-[11px] font-body tracking-wider text-center leading-tight px-2">
-                  {adminToken ? "Add photos" : "Admin only"}
+                  Add photos
                 </span>
               </>
           }

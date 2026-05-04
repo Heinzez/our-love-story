@@ -30,15 +30,22 @@ serve(async (req) => {
 
   try {
     const token = req.headers.get("x-admin-token");
-    const ok = await verifyAdmin(token);
-    if (!ok) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const body = await req.json();
     const action = body?.action as string;
+
+    // Public action: anyone can upload to the "landing" gallery.
+    // All other actions (delete/update/reorder/page settings/notify) require admin token.
+    const isPublicLandingUpload =
+      action === "upload-image" && body?.pageKey === "landing";
+
+    if (!isPublicLandingUpload) {
+      const ok = await verifyAdmin(token);
+      if (!ok) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     if (action === "update-page") {
       const { pageKey, premiereDate, description } = body;
