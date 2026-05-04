@@ -12,7 +12,7 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-const PAGE_KEYS = new Set(["our-story", "the-journey", "laughs", "letters", "goals"]);
+const PAGE_KEYS = new Set(["landing", "our-story", "the-journey", "laughs", "letters", "goals"]);
 
 async function verifyAdmin(token: string | null): Promise<boolean> {
   if (!token) return false;

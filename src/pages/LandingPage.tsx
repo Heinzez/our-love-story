@@ -39,8 +39,7 @@ import FloatingElements from "@/components/FloatingElements";
 import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight, Plus, ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { UserPhoto } from "../../shared/schema";
+import { supabase } from "@/integrations/supabase/client";
 
 const STATIC_PHOTOS = [
   photo1, photo2, photo3, photo4, photo5, photo6, photo7,
@@ -223,21 +222,45 @@ const PhotoGroup = ({
 
 // ── Photo Upload Button ────────────────────────────────────────
 const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
+  const { adminToken } = useSite();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result || "").split(",")[1] || "");
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    if (!adminToken) {
+      setError("Only the admin can add photos here.");
+      return;
+    }
     setUploading(true);
+    setError(null);
     for (const file of Array.from(files)) {
-      const formData = new FormData();
-      formData.append("photo", file);
       try {
-        const res = await fetch("/api/photos/upload", { method: "POST", body: formData });
-        if (!res.ok) throw new Error("Upload failed");
+        if (file.size > 6 * 1024 * 1024) throw new Error("Max 6MB per image");
+        const base64 = await fileToBase64(file);
+        const { data, error } = await supabase.functions.invoke("admin-mutate", {
+          body: {
+            action: "upload-image",
+            pageKey: "landing",
+            fileName: file.name,
+            fileBase64: base64,
+          },
+          headers: { "x-admin-token": adminToken },
+        });
+        if (error) throw new Error(error.message);
+        if (data?.error) throw new Error(data.error);
       } catch (e) {
         console.error(e);
+        setError((e as Error).message);
       }
     }
     setUploading(false);
@@ -262,7 +285,7 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
         <button
           data-testid="button-photo-add"
           onClick={() => fileRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || !adminToken}
           className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 text-primary/60 hover:text-primary transition-all duration-300 active:scale-95 disabled:opacity-50"
           style={{ width: CARD_W, height: CARD_H }}
         >
@@ -273,13 +296,13 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
                   <Plus className="w-5 h-5" />
                 </div>
                 <span className="text-[11px] font-body tracking-wider text-center leading-tight px-2">
-                  Add photos
+                  {adminToken ? "Add photos" : "Admin only"}
                 </span>
               </>
           }
         </button>
         <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground/30 font-body tracking-widest uppercase whitespace-nowrap pointer-events-none">
-          {uploading ? "uploading..." : "tap to add"}
+          {uploading ? "uploading..." : error ? error : "tap to add"}
         </div>
       </div>
     </>
@@ -288,22 +311,18 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
 
 // ── Main Page ──────────────────────────────────────────────
 const LandingPage = () => {
-  const { subscribedEmail, setSubscribedEmail } = useSite();
+  const { subscribedEmail, setSubscribedEmail, pageImages, refreshPageData } = useSite();
   const [emailInput, setEmailInput] = useState("");
   const [backupEmail, setBackupEmail] = useState("");
   const [showBackup, setShowBackup] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
-  const qc = useQueryClient();
 
-  const { data: uploadedPhotos = [] } = useQuery<UserPhoto[]>({
-    queryKey: ["/api/photos"],
-    refetchInterval: false,
-  });
+  const uploadedPhotos = pageImages["landing"] ?? [];
 
-  // Combine: user-uploaded (newest first) + static photos
+  // Combine: admin-uploaded (newest first) + static photos
   const allPhotos = [
-    ...uploadedPhotos.map(p => p.url),
+    ...uploadedPhotos.map((p) => p.publicUrl),
     ...STATIC_PHOTOS,
   ];
 
@@ -421,7 +440,7 @@ const LandingPage = () => {
             <div className="h-px w-16 bg-gradient-to-l from-transparent to-primary/30" />
           </div>
           <div className="flex justify-center">
-            <PhotoUploadButton onUploaded={() => qc.invalidateQueries({ queryKey: ["/api/photos"] })} />
+            <PhotoUploadButton onUploaded={() => refreshPageData()} />
           </div>
         </div>
       </section>
