@@ -36,7 +36,7 @@ import photo35 from "@/assets/photo35.jpg";
 import photo36 from "@/assets/photo36.jpg";
 import photo37 from "@/assets/photo37.jpg";
 import FloatingElements from "@/components/FloatingElements";
-import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight, Plus, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight, Plus, ImagePlus, Loader2, Trash2, Video, Film } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -220,8 +220,8 @@ const PhotoGroup = ({
   );
 };
 
-// ── Photo Upload Button ────────────────────────────────────────
-const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
+// ── Media Upload Button (image OR video) ──────────────────────
+const MediaUploadButton = ({ kind, onUploaded }: { kind: "image" | "video"; onUploaded: () => void }) => {
   const { adminToken } = useSite();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -235,13 +235,25 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
       r.readAsDataURL(file);
     });
 
+  const validate = (file: File): string | null => {
+    if (kind === "image") {
+      if (!file.type.startsWith("image/")) return "Only image files are allowed";
+      if (file.size > 6 * 1024 * 1024) return "Max 6MB per image";
+    } else {
+      if (!file.type.startsWith("video/")) return "Only video files are allowed";
+      if (file.size > 40 * 1024 * 1024) return "Max 40MB per video";
+    }
+    return null;
+  };
+
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setUploading(true);
     setError(null);
     for (const file of Array.from(files)) {
       try {
-        if (file.size > 6 * 1024 * 1024) throw new Error("Max 6MB per image");
+        const v = validate(file);
+        if (v) throw new Error(v);
         const base64 = await fileToBase64(file);
         const { data, error } = await supabase.functions.invoke("admin-mutate", {
           body: {
@@ -249,6 +261,7 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
             pageKey: "landing",
             fileName: file.name,
             fileBase64: base64,
+            mediaType: kind,
           },
           headers: adminToken ? { "x-admin-token": adminToken } : undefined,
         });
@@ -268,7 +281,7 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept={kind === "image" ? "image/*" : "video/*"}
         multiple
         className="hidden"
         data-testid="input-photo-upload"
@@ -289,10 +302,10 @@ const PhotoUploadButton = ({ onUploaded }: { onUploaded: () => void }) => {
             ? <Loader2 className="w-7 h-7 animate-spin" />
             : <>
                 <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Plus className="w-5 h-5" />
+                  {kind === "image" ? <Plus className="w-5 h-5" /> : <Video className="w-5 h-5" />}
                 </div>
                 <span className="text-[11px] font-body tracking-wider text-center leading-tight px-2">
-                  Add photos
+                  {kind === "image" ? "Add photos" : "Add videos"}
                 </span>
               </>
           }
@@ -314,7 +327,9 @@ const LandingPage = () => {
   const [submitted, setSubmitted] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
-  const uploadedPhotos = pageImages["landing"] ?? [];
+  const allLandingMedia = pageImages["landing"] ?? [];
+  const uploadedPhotos = allLandingMedia.filter((m) => (m.media_type ?? "image") === "image");
+  const uploadedVideos = allLandingMedia.filter((m) => m.media_type === "video");
 
   // Combine: admin-uploaded (newest first) + static photos
   const allPhotos = [
@@ -436,8 +451,41 @@ const LandingPage = () => {
             <div className="h-px w-16 bg-gradient-to-l from-transparent to-primary/30" />
           </div>
           <div className="flex justify-center">
-            <PhotoUploadButton onUploaded={() => refreshPageData()} />
+            <MediaUploadButton kind="image" onUploaded={() => refreshPageData()} />
           </div>
+        </div>
+      </section>
+
+      {/* ── Video Memories ── */}
+      <section className="relative z-10 max-w-3xl mx-auto px-4 mt-32">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/8 text-primary text-[10px] font-body tracking-widest uppercase mb-3">
+            <Film className="w-3 h-3" /> Moving Memories
+          </div>
+          <h2 className="text-3xl md:text-4xl font-display gradient-text mb-2">Video Memories</h2>
+          <p className="text-muted-foreground text-sm font-body">your voice, your laugh, your magic ✨</p>
+        </div>
+
+        {uploadedVideos.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
+            {uploadedVideos.map((v) => (
+              <div key={v.id} className="glass-card rounded-2xl overflow-hidden border border-primary/20 hover:border-primary/40 transition-all">
+                <video
+                  src={v.publicUrl}
+                  controls
+                  preload="metadata"
+                  className="w-full bg-black aspect-video"
+                />
+                {v.caption && (
+                  <p className="text-xs text-muted-foreground font-body p-3 text-center italic">"{v.caption}"</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-center">
+          <MediaUploadButton kind="video" onUploaded={() => refreshPageData()} />
         </div>
       </section>
 
