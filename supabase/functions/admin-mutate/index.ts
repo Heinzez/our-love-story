@@ -59,26 +59,34 @@ serve(async (req) => {
     }
 
     if (action === "upload-image") {
-      const { pageKey, fileName, fileBase64, caption } = body;
+      const { pageKey, fileName, fileBase64, caption, mediaType } = body;
       if (!PAGE_KEYS.has(pageKey)) return json({ error: "Invalid page" }, 400);
       if (typeof fileBase64 !== "string" || !fileName) return json({ error: "Missing file" }, 400);
-      // size guard ~ 6MB base64
-      if (fileBase64.length > 8_500_000) return json({ error: "File too large (max 6MB)" }, 400);
       const ext = String(fileName).split(".").pop()?.toLowerCase() || "jpg";
-      if (!["jpg","jpeg","png","webp","gif"].includes(ext)) return json({ error: "Invalid file type" }, 400);
+      const isVideo = mediaType === "video" || ["mp4","webm","mov","m4v"].includes(ext);
+      const allowedImg = ["jpg","jpeg","png","webp","gif"];
+      const allowedVid = ["mp4","webm","mov","m4v"];
+      if (isVideo && !allowedVid.includes(ext)) return json({ error: "Invalid video type" }, 400);
+      if (!isVideo && !allowedImg.includes(ext)) return json({ error: "Invalid file type" }, 400);
+      // base64 length ≈ 4/3 * bytes. Image cap 6MB, video cap 40MB.
+      const maxB64 = isVideo ? 56_000_000 : 8_500_000;
+      if (fileBase64.length > maxB64) return json({ error: isVideo ? "Video too large (max 40MB)" : "Image too large (max 6MB)" }, 400);
       const path = `${pageKey}/${crypto.randomUUID()}.${ext}`;
       const bytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
+      const contentType = isVideo
+        ? (ext === "mov" ? "video/quicktime" : `video/${ext}`)
+        : `image/${ext === "jpg" ? "jpeg" : ext}`;
       const { error: upErr } = await supabase.storage.from("premiere-media").upload(path, bytes, {
-        contentType: `image/${ext === "jpg" ? "jpeg" : ext}`,
-        upsert: false,
+        contentType, upsert: false,
       });
       if (upErr) throw upErr;
       const { error: insErr } = await supabase.from("page_images").insert({
         page_key: pageKey, image_path: path, caption: caption ? String(caption).slice(0, 200) : null,
+        media_type: isVideo ? "video" : "image",
       });
       if (insErr) throw insErr;
       const { data: pub } = supabase.storage.from("premiere-media").getPublicUrl(path);
-      return json({ ok: true, url: pub.publicUrl, path });
+      return json({ ok: true, url: pub.publicUrl, path, mediaType: isVideo ? "video" : "image" });
     }
 
     if (action === "delete-image") {
