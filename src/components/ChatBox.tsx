@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useSite } from "@/context/SiteContext";
-import type { ChatMessage } from "../../shared/schema";
+import { supabase } from "@/integrations/supabase/client";
+
+type ChatMessage = {
+  id: string;
+  text: string;
+  sender: "her" | "me";
+  status: "sent" | "delivered" | "seen";
+  date: string;
+  isAi: boolean;
+  createdAt: string;
+};
 
 // ── Status display ────────────────────────────────────────────
 const STATUS_ICONS: Record<string, string> = {
@@ -67,10 +76,8 @@ function playChime() {
   }
 }
 
-const ADMIN_SECRET = "your ability to lie";
-
 export default function ChatBox() {
-  const { isAdmin } = useSite();
+  const { isAdmin, adminToken } = useSite();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [unread, setUnread] = useState(0);
@@ -80,18 +87,26 @@ export default function ChatBox() {
   const qc = useQueryClient();
 
   const { data: messages = [], isLoading } = useQuery<ChatMessage[]>({
-    queryKey: ["/api/chat/messages"],
+    queryKey: ["chat-messages"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("chat", { body: { action: "list" } });
+      if (error) throw new Error(error.message);
+      return (data as ChatMessage[]) || [];
+    },
     refetchInterval: open ? 4000 : 10000,
   });
 
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {
-      const endpoint = isAdmin ? "/api/chat/reply" : "/api/chat/send";
-      const body = isAdmin ? { text, secret: ADMIN_SECRET } : { text };
-      const res = await apiRequest(endpoint, { method: "POST", body: JSON.stringify(body) });
-      return res.json();
+      const { data, error } = await supabase.functions.invoke("chat", {
+        body: { action: isAdmin ? "reply" : "send", text },
+        headers: isAdmin && adminToken ? { "x-admin-token": adminToken } : undefined,
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/chat/messages"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-messages"] }),
   });
 
   // Mark seen when chat opens — different logic for admin vs her
@@ -99,11 +114,7 @@ export default function ChatBox() {
     if (!open) return;
     setUnread(0);
     const markSender = isAdmin ? "her" : "me";
-    fetch("/api/chat/seen", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markSender }),
-    }).catch(() => {});
+    supabase.functions.invoke("chat", { body: { action: "seen", markSender } }).catch(() => {});
   }, [open, isAdmin]);
 
   // Detect new incoming messages → update unread badge + play chime
