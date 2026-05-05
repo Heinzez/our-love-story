@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSite } from "@/context/SiteContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Image as ImageIcon, Calendar, Loader2, Trash2, Upload, Check, ArrowUp, ArrowDown, Pencil, Send, X } from "lucide-react";
+import { Image as ImageIcon, Calendar, Loader2, Trash2, Upload, Check, ArrowUp, ArrowDown, Pencil, Send, X, GripVertical } from "lucide-react";
 
 const PAGES: { key: string; label: string; emoji: string }[] = [
   { key: "landing", label: "Home Gallery", emoji: "🏠" },
@@ -35,6 +35,7 @@ const AdminPageEditor = () => {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; path: string; url: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const setting = pageSettings[active];
   const images = pageImages[active] ?? [];
@@ -69,7 +70,10 @@ const AdminPageEditor = () => {
   const upload = async (file: File) => {
     setBusy(true); setErr(null); setMsg(null);
     try {
-      if (file.size > 6 * 1024 * 1024) throw new Error("Max 6MB per image.");
+      const isVideo = file.type.startsWith("video/");
+      if (isVideo && file.size > 40 * 1024 * 1024) throw new Error("Max 40MB per video.");
+      if (!isVideo && file.size > 6 * 1024 * 1024) throw new Error("Max 6MB per image.");
+      if (!isVideo && !file.type.startsWith("image/")) throw new Error("Only images or videos allowed.");
       const base64 = await fileToBase64(file);
       await call({
         action: "upload-image",
@@ -77,8 +81,9 @@ const AdminPageEditor = () => {
         fileName: file.name,
         fileBase64: base64,
         caption: caption || undefined,
+        mediaType: isVideo ? "video" : "image",
       });
-      setMsg("Image uploaded.");
+      setMsg(isVideo ? "Video uploaded." : "Image uploaded.");
       setCaption("");
       await refreshPageData();
     } catch (e) { setErr((e as Error).message); }
@@ -114,6 +119,22 @@ const AdminPageEditor = () => {
     setBusy(true); setErr(null);
     try {
       await call({ action: "reorder-images", pageKey: active, orderedIds: reordered.map((i) => i.id) });
+      await refreshPageData();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  const handleDrop = async (targetId: string) => {
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    const ids = images.map((i) => i.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) { setDragId(null); return; }
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    setDragId(null);
+    setBusy(true); setErr(null);
+    try {
+      await call({ action: "reorder-images", pageKey: active, orderedIds: ids });
       await refreshPageData();
     } catch (e) { setErr((e as Error).message); }
     finally { setBusy(false); }
@@ -218,10 +239,10 @@ const AdminPageEditor = () => {
         />
         <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-primary/30 text-muted-foreground hover:text-foreground hover:border-primary/60 cursor-pointer transition-all">
           <Upload className="w-4 h-4" />
-          <span className="font-body text-sm">{busy ? "Uploading…" : "Upload an image (max 6MB)"}</span>
+          <span className="font-body text-sm">{busy ? "Uploading…" : "Upload image (≤6MB) or video (≤40MB)"}</span>
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
             disabled={busy}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }}
             className="hidden"
@@ -240,8 +261,23 @@ const AdminPageEditor = () => {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {images.map((img, idx) => (
-              <div key={img.id} className="relative group rounded-xl overflow-hidden border border-border/40">
-                <img src={img.publicUrl} alt={img.caption || ""} className="w-full h-28 object-cover" />
+              <div
+                key={img.id}
+                draggable
+                onDragStart={() => setDragId(img.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(img.id)}
+                onDragEnd={() => setDragId(null)}
+                className={`relative group rounded-xl overflow-hidden border transition-all ${dragId === img.id ? "border-primary opacity-50" : "border-border/40"}`}
+              >
+                {(img.media_type === "video") ? (
+                  <video src={img.publicUrl} className="w-full h-28 object-cover bg-black" muted />
+                ) : (
+                  <img src={img.publicUrl} alt={img.caption || ""} className="w-full h-28 object-cover" />
+                )}
+                <div className="absolute top-1 left-1 p-1 rounded bg-black/60 text-white/70 cursor-grab opacity-0 group-hover:opacity-100" title="Drag to reorder">
+                  <GripVertical className="w-3.5 h-3.5" />
+                </div>
                 {editingId === img.id ? (
                   <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-1.5 flex gap-1">
                     <input
