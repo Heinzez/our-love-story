@@ -19,6 +19,7 @@ export interface PageImage {
   image_path: string;
   caption: string | null;
   sort_order: number;
+  media_type?: string;
   publicUrl: string;
 }
 
@@ -66,7 +67,7 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
   const refreshPageData = async () => {
     const [{ data: settings }, { data: images }] = await Promise.all([
       supabase.from("page_settings").select("page_key, premiere_date, description"),
-      supabase.from("page_images").select("id, page_key, image_path, caption, sort_order").order("sort_order", { ascending: true }),
+      supabase.from("page_images").select("id, page_key, image_path, caption, sort_order, media_type").order("sort_order", { ascending: true }),
     ]);
     if (settings) {
       const map: Record<string, PageSetting> = {};
