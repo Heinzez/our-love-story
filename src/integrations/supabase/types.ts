@@ -53,6 +53,42 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          is_ai: boolean
+          page_key: string | null
+          sender: string
+          status: string
+          telegram_message_id: number | null
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          is_ai?: boolean
+          page_key?: string | null
+          sender: string
+          status?: string
+          telegram_message_id?: number | null
+          text: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          is_ai?: boolean
+          page_key?: string | null
+          sender?: string
+          status?: string
+          telegram_message_id?: number | null
+          text?: string
+        }
+        Relationships: []
+      }
       email_subscribers: {
         Row: {
           backup_email: string | null
@@ -80,6 +116,7 @@ export type Database = {
           created_at: string
           id: string
           image_path: string
+          media_type: string
           page_key: string
           sort_order: number
         }
@@ -88,6 +125,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_path: string
+          media_type?: string
           page_key: string
           sort_order?: number
         }
@@ -96,6 +134,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_path?: string
+          media_type?: string
           page_key?: string
           sort_order?: number
         }
@@ -140,6 +179,69 @@ export type Database = {
           date?: string
           id?: string
           text?: string
+        }
+        Relationships: []
+      }
+      telegram_updates: {
+        Row: {
+          chat_id: number | null
+          message_id: number | null
+          page_key: string | null
+          raw_update: Json
+          received_at: string
+          text: string | null
+          update_id: number
+        }
+        Insert: {
+          chat_id?: number | null
+          message_id?: number | null
+          page_key?: string | null
+          raw_update: Json
+          received_at?: string
+          text?: string | null
+          update_id: number
+        }
+        Update: {
+          chat_id?: number | null
+          message_id?: number | null
+          page_key?: string | null
+          raw_update?: Json
+          received_at?: string
+          text?: string | null
+          update_id?: number
+        }
+        Relationships: []
+      }
+      telegram_webhook_status: {
+        Row: {
+          id: string
+          info: Json | null
+          is_registered: boolean
+          last_checked_at: string | null
+          last_error: string | null
+          last_registered_at: string | null
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          id?: string
+          info?: Json | null
+          is_registered?: boolean
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_registered_at?: string | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          id?: string
+          info?: Json | null
+          is_registered?: boolean
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_registered_at?: string | null
+          updated_at?: string
+          webhook_url?: string | null
         }
         Relationships: []
       }
