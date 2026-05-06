@@ -145,6 +145,46 @@ const Navigation = () => {
               </div>
             </div>
 
+            {/* More dropdown */}
+            <div className="relative shrink-0" ref={moreRef}>
+              <button
+                onClick={() => setMoreOpen((o) => !o)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[13px] font-body tracking-wide transition-all"
+                style={{ color: "hsl(30 10% 52%)", background: moreOpen ? "hsl(338 80% 62% / 0.1)" : undefined }}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+                <span className="hidden sm:inline">More</span>
+              </button>
+              {moreOpen && (
+                <div
+                  className="absolute right-0 top-full mt-2 w-52 rounded-2xl overflow-hidden z-50"
+                  style={{
+                    background: "hsl(340 18% 9% / 0.96)",
+                    backdropFilter: "blur(20px) saturate(1.4)",
+                    border: "1px solid hsl(338 80% 62% / 0.18)",
+                    boxShadow: "0 12px 40px hsl(340 18% 4% / 0.6)",
+                  }}
+                >
+                  {moreItems.map(({ label, Icon, comingSoon }) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-body cursor-not-allowed opacity-80 hover:bg-white/5 transition-colors"
+                      style={{ color: "hsl(30 10% 75%)" }}
+                    >
+                      <Icon className="w-4 h-4 text-primary/80" />
+                      <span className="flex-1">{label}</span>
+                      {comingSoon && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-display tracking-wider"
+                          style={{ background: "hsl(338 80% 62% / 0.15)", color: "hsl(338 80% 75%)" }}>
+                          SOON
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Admin link */}
             {isAdmin && (
               <button
