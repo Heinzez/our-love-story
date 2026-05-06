@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Heart, BookOpen, Compass, Smile, Mail,
   Sparkles, ScrollText, Shield, Gift,
+  MoreHorizontal, FolderLock, Wallet,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const tabs = [
   { path: "/our-story",   label: "Our Story",       Icon: BookOpen  },
@@ -20,10 +21,25 @@ const Navigation = () => {
   const { isAdmin, hasNewNote, clearNewNote } = useSite();
   const location = useLocation();
   const navigate = useNavigate();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (location.pathname === "/my-notes" && hasNewNote) clearNewNote();
   }, [location.pathname, hasNewNote, clearNewNote]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const moreItems = [
+    { label: "File Vault", Icon: FolderLock, comingSoon: true },
+    { label: "FinTip", Icon: Wallet, comingSoon: true },
+  ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50">
