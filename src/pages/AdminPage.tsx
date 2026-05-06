@@ -8,17 +8,6 @@ import { useSite } from "@/context/SiteContext";
 import AdminPageEditor from "@/components/AdminPageEditor";
 import { supabase } from "@/integrations/supabase/client";
 
-const post = async (url: string, body: unknown) => {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error || "Request failed");
-  return data;
-};
-
 type Settings = { giftLocked: boolean; weeklyGiftAmount: number };
 type Subscriber = { id: string; primaryEmail: string; backupEmail: string | null; subscribedAt: string };
 
