@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Gift, Check, Send, ChevronRight, Lock, Loader2, History, Shield, AlertCircle } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const post = async (url: string, body: unknown) => {
   const res = await fetch(url, {
@@ -43,8 +44,12 @@ const GiftPageContent = () => {
   });
 
   const { data: settings } = useQuery<Settings>({
-    queryKey: ["/api/settings"],
-    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+    queryKey: ["site-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("admin-mutate", { body: { action: "get-settings" } });
+      if (error) throw new Error(error.message);
+      return data as Settings;
+    },
   });
 
   const { data: dailyData } = useQuery<DailySent>({
