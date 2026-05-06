@@ -38,13 +38,34 @@ serve(async (req) => {
     const isPublicLandingUpload =
       action === "upload-image" && body?.pageKey === "landing";
 
-    if (!isPublicLandingUpload) {
+    const isPublicGetSettings = action === "get-settings";
+
+    if (!isPublicLandingUpload && !isPublicGetSettings) {
       const ok = await verifyAdmin(token);
       if (!ok) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    }
+
+    if (action === "get-settings") {
+      const { data } = await supabase.from("site_settings").select("key, value");
+      const map: Record<string, string> = {};
+      for (const r of (data ?? []) as { key: string; value: string }[]) map[r.key] = r.value;
+      return json({
+        giftLocked: (map["gift_locked"] ?? "false") === "true",
+        weeklyGiftAmount: parseInt(map["weekly_gift_amount"] ?? "500", 10),
+      });
+    }
+
+    if (action === "set-setting") {
+      const { key, value } = body as { key?: string; value?: string };
+      const allowed = new Set(["gift_locked", "weekly_gift_amount"]);
+      if (!key || !allowed.has(key) || typeof value !== "string") return json({ error: "Invalid setting" }, 400);
+      const { error } = await supabase.from("site_settings").upsert({ key, value, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      return json({ ok: true });
     }
 
     if (action === "update-page") {

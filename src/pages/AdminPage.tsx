@@ -8,17 +8,6 @@ import { useSite } from "@/context/SiteContext";
 import AdminPageEditor from "@/components/AdminPageEditor";
 import { supabase } from "@/integrations/supabase/client";
 
-const post = async (url: string, body: unknown) => {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error || "Request failed");
-  return data;
-};
-
 type Settings = { giftLocked: boolean; weeklyGiftAmount: number };
 type Subscriber = { id: string; primaryEmail: string; backupEmail: string | null; subscribedAt: string };
 
@@ -74,23 +63,47 @@ const AdminPage = () => {
   };
 
   const { data: settings } = useQuery<Settings>({
-    queryKey: ["/api/settings"],
-    queryFn: () => fetch("/api/settings").then((r) => r.json()),
+    queryKey: ["site-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("admin-mutate", { body: { action: "get-settings" } });
+      if (error) throw new Error(error.message);
+      return data as Settings;
+    },
   });
 
   const { data: subscribers = [] } = useQuery<Subscriber[]>({
-    queryKey: ["/api/admin/subscribers"],
-    queryFn: () => fetch("/api/admin/subscribers").then((r) => r.json()),
+    queryKey: ["subscribers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("email_subscribers")
+        .select("id, primary_email, backup_email, subscribed_at")
+        .order("subscribed_at", { ascending: false });
+      if (error) return [];
+      return (data ?? []).map((s: any) => ({
+        id: s.id, primaryEmail: s.primary_email, backupEmail: s.backup_email, subscribedAt: s.subscribed_at,
+      }));
+    },
+    enabled: isAdmin,
   });
 
   const settingsMutation = useMutation({
-    mutationFn: ({ key, value }: { key: string; value: string }) =>
-      post("/api/admin/settings", { key, value }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/settings"] }),
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      const { data, error } = await supabase.functions.invoke("admin-mutate", {
+        body: { action: "set-setting", key, value },
+        headers: adminToken ? { "x-admin-token": adminToken } : undefined,
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["site-settings"] }),
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: () => post("/api/admin/send-email", { subject: emailSubject, message: emailMessage }),
+    mutationFn: async () => {
+      // Email sending isn't wired to an edge function yet. Show a friendly message.
+      throw new Error("Email sending requires an SMTP edge function setup — coming soon.");
+    },
     onSuccess: (data: { sent: number; message?: string }) => {
       setEmailResult(data);
       setEmailSubject("");
