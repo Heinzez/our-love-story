@@ -222,10 +222,11 @@ const PhotoGroup = ({
 
 // ── Media Upload Button (image OR video) ──────────────────────
 const MediaUploadButton = ({ kind, onUploaded }: { kind: "image" | "video"; onUploaded: () => void }) => {
-  const { adminToken } = useSite();
+  const { adminToken, isAdmin } = useSite();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ name: string; pct: number; status: "pending" | "done" | "error"; file?: File }[]>([]);
 
   const fileToBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -246,34 +247,57 @@ const MediaUploadButton = ({ kind, onUploaded }: { kind: "image" | "video"; onUp
     return null;
   };
 
+  const uploadOne = async (file: File, idx: number) => {
+    setProgress((p) => p.map((it, i) => i === idx ? { ...it, status: "pending", pct: 10 } : it));
+    const v = validate(file);
+    if (v) throw new Error(v);
+    const base64 = await fileToBase64(file);
+    setProgress((p) => p.map((it, i) => i === idx ? { ...it, pct: 60 } : it));
+    const { data, error } = await supabase.functions.invoke("admin-mutate", {
+      body: {
+        action: "upload-image",
+        pageKey: "landing",
+        fileName: file.name,
+        fileBase64: base64,
+        mediaType: kind,
+        uploadedBy: isAdmin ? "admin" : "her",
+      },
+      headers: adminToken ? { "x-admin-token": adminToken } : undefined,
+    });
+    if (error) throw new Error(error.message);
+    if (data?.error) throw new Error(data.error);
+    setProgress((p) => p.map((it, i) => i === idx ? { ...it, pct: 100, status: "done" } : it));
+  };
+
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setUploading(true);
     setError(null);
-    for (const file of Array.from(files)) {
+    const arr = Array.from(files);
+    setProgress(arr.map((f) => ({ name: f.name, pct: 0, status: "pending" as const, file: f })));
+    setUploading(true);
+    for (let i = 0; i < arr.length; i++) {
       try {
-        const v = validate(file);
-        if (v) throw new Error(v);
-        const base64 = await fileToBase64(file);
-        const { data, error } = await supabase.functions.invoke("admin-mutate", {
-          body: {
-            action: "upload-image",
-            pageKey: "landing",
-            fileName: file.name,
-            fileBase64: base64,
-            mediaType: kind,
-          },
-          headers: adminToken ? { "x-admin-token": adminToken } : undefined,
-        });
-        if (error) throw new Error(error.message);
-        if (data?.error) throw new Error(data.error);
+        await uploadOne(arr[i], i);
       } catch (e) {
         console.error(e);
-        setError((e as Error).message);
+        setProgress((p) => p.map((it, idx) => idx === i ? { ...it, status: "error", pct: 0 } : it));
       }
     }
     setUploading(false);
     onUploaded();
+    // clear progress after a beat
+    setTimeout(() => setProgress((p) => p.filter((it) => it.status === "error")), 2500);
+  };
+
+  const retry = async (idx: number) => {
+    const f = progress[idx]?.file;
+    if (!f) return;
+    try {
+      await uploadOne(f, idx);
+      onUploaded();
+    } catch (e) {
+      setProgress((p) => p.map((it, i) => i === idx ? { ...it, status: "error", pct: 0 } : it));
+    }
   };
 
   return (
@@ -289,13 +313,13 @@ const MediaUploadButton = ({ kind, onUploaded }: { kind: "image" | "video"; onUp
       />
       <div
         className="relative flex justify-center select-none"
-        style={{ width: "100%", height: CARD_H + 28 }}
+        style={{ width: "100%", minHeight: CARD_H + 28 }}
       >
         <button
           data-testid="button-photo-add"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 text-primary/60 hover:text-primary transition-all duration-300 active:scale-95 disabled:opacity-50"
+          className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 text-primary/60 hover:text-primary transition-all duration-300 active:scale-95 disabled:opacity-50"
           style={{ width: CARD_W, height: CARD_H }}
         >
           {uploading
@@ -305,15 +329,32 @@ const MediaUploadButton = ({ kind, onUploaded }: { kind: "image" | "video"; onUp
                   {kind === "image" ? <Plus className="w-5 h-5" /> : <Video className="w-5 h-5" />}
                 </div>
                 <span className="text-[11px] font-body tracking-wider text-center leading-tight px-2">
-                  {kind === "image" ? "Add photos" : "Add videos"}
+                  {kind === "image" ? "Add photos (multiple ok)" : "Add videos"}
                 </span>
               </>
           }
         </button>
-        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground/30 font-body tracking-widest uppercase whitespace-nowrap pointer-events-none">
-          {uploading ? "uploading..." : error ? error : "tap to add"}
-        </div>
       </div>
+      {progress.length > 0 && (
+        <div className="w-full max-w-md mx-auto mt-4 space-y-1.5">
+          {progress.map((it, i) => (
+            <div key={i} className="text-[11px] font-body">
+              <div className="flex items-center justify-between gap-2 mb-0.5">
+                <span className="truncate flex-1 text-muted-foreground">{it.name}</span>
+                {it.status === "error" ? (
+                  <button onClick={() => retry(i)} className="text-primary underline">Retry</button>
+                ) : (
+                  <span className="text-muted-foreground/60">{it.pct}%</span>
+                )}
+              </div>
+              <div className="h-1 rounded-full bg-muted/40 overflow-hidden">
+                <div className={`h-full transition-all ${it.status === "error" ? "bg-red-500/70" : "bg-primary"}`} style={{ width: `${it.pct}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <p className="text-red-400/80 text-xs mt-2 text-center">{error}</p>}
     </>
   );
 };
@@ -330,6 +371,7 @@ const LandingPage = () => {
   const allLandingMedia = pageImages["landing"] ?? [];
   const uploadedPhotos = allLandingMedia.filter((m) => (m.media_type ?? "image") === "image");
   const uploadedVideos = allLandingMedia.filter((m) => m.media_type === "video");
+  const herPhotoCount = uploadedPhotos.filter((m) => m.uploaded_by === "her").length;
 
   // Combine: admin-uploaded (newest first) + static photos
   const allPhotos = [
@@ -421,9 +463,9 @@ const LandingPage = () => {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-display gradient-text mb-2">Our Memories</h2>
           <p className="text-muted-foreground text-sm font-body">hover each stack · click to open</p>
-          {uploadedPhotos.length > 0 && (
+          {herPhotoCount > 0 && (
             <p className="text-primary/50 text-xs font-body mt-1">
-              {uploadedPhotos.length} photo{uploadedPhotos.length !== 1 ? "s" : ""} added by you ✨
+              {herPhotoCount} photo{herPhotoCount !== 1 ? "s" : ""} added by you ✨
             </p>
           )}
         </div>
