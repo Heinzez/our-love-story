@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck } from "lucide-react";
+import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck, Paperclip, Mic, Image as ImageIcon, Film, Square } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSite } from "@/context/SiteContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,8 @@ type ChatMessage = {
   date: string;
   isAi: boolean;
   createdAt: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
 };
 
 // ── Status display ────────────────────────────────────────────
@@ -81,6 +83,14 @@ export default function ChatBox() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [unread, setUnread] = useState(0);
+  const [pollMs, setPollMs] = useState(4000);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [sendingMedia, setSendingMedia] = useState(false);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const vidInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMsgCount = useRef(0);
   const prevMsgIds = useRef<Set<string>>(new Set());
@@ -93,7 +103,7 @@ export default function ChatBox() {
       if (error) throw new Error(error.message);
       return (data as ChatMessage[]) || [];
     },
-    refetchInterval: open ? 4000 : 10000,
+    refetchInterval: open ? pollMs : Math.max(pollMs, 10000),
   });
 
   const sendMutation = useMutation({
@@ -106,8 +116,71 @@ export default function ChatBox() {
       if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-messages"] }),
+    onSuccess: () => { setPollMs(4000); qc.invalidateQueries({ queryKey: ["chat-messages"] }); },
+    onError: (e: Error) => {
+      // Back off on rate limit
+      if (/slow down/i.test(e.message) || /429/.test(e.message)) setPollMs((p) => Math.min(p * 2, 30000));
+    },
   });
+
+  const fileToBase64 = (file: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result || "").split(",")[1] || "");
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+
+  const sendMedia = async (file: Blob, kind: "image" | "video" | "audio", fileName: string) => {
+    setSendingMedia(true);
+    try {
+      // size caps
+      const cap = kind === "video" ? 40 * 1024 * 1024 : kind === "audio" ? 10 * 1024 * 1024 : 6 * 1024 * 1024;
+      if (file.size > cap) throw new Error(`File too large. Max ${cap / 1024 / 1024}MB.`);
+      const fileBase64 = await fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke("chat", {
+        body: {
+          action: "send-media",
+          fileBase64, fileName, kind,
+          sender: isAdmin ? "me" : "her",
+        },
+        headers: isAdmin && adminToken ? { "x-admin-token": adminToken } : undefined,
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      qc.invalidateQueries({ queryKey: ["chat-messages"] });
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSendingMedia(false);
+      setAttachOpen(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        stream.getTracks().forEach((t) => t.stop());
+        await sendMedia(blob, "audio", `voice-${Date.now()}.webm`);
+      };
+      mr.start();
+      mediaRecRef.current = mr;
+      setRecording(true);
+    } catch (e) {
+      alert("Microphone access denied.");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecRef.current?.stop();
+    mediaRecRef.current = null;
+    setRecording(false);
+  };
 
   // Mark seen when chat opens — different logic for admin vs her
   useEffect(() => {
@@ -266,7 +339,16 @@ export default function ChatBox() {
                       {m.isAi && (
                         <span className="text-[10px] opacity-50 block mb-0.5">✨ auto-reply</span>
                       )}
-                      <p>{m.text}</p>
+                      {m.mediaUrl && m.mediaType === "image" && (
+                        <img src={m.mediaUrl} alt="" className="rounded-lg max-w-full mb-1.5" />
+                      )}
+                      {m.mediaUrl && m.mediaType === "video" && (
+                        <video src={m.mediaUrl} controls className="rounded-lg max-w-full mb-1.5" />
+                      )}
+                      {m.mediaUrl && m.mediaType === "audio" && (
+                        <audio src={m.mediaUrl} controls className="w-full mb-1.5" />
+                      )}
+                      {m.text && <p>{m.text}</p>}
                       <div className={`flex items-center gap-1 mt-1 justify-end ${isMine ? "text-white/50" : "text-muted-foreground/50"}`}>
                         <span className="text-[10px]">{formatTime(m.createdAt as unknown as string)}</span>
                         {isMine && (
@@ -289,6 +371,46 @@ export default function ChatBox() {
           className="shrink-0 px-3 py-3 border-t border-border/40 flex items-end gap-2"
           style={{ background: "hsl(var(--background))" }}
         >
+          {/* Attach menu */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setAttachOpen((o) => !o)}
+              className="w-10 h-10 rounded-2xl bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-primary transition-all mb-0.5"
+              title="Attach"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            {attachOpen && (
+              <div className="absolute bottom-12 left-0 z-50 rounded-xl bg-card border border-border/60 shadow-xl p-1 w-44">
+                <button onClick={() => imgInputRef.current?.click()} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/60 text-sm text-foreground">
+                  <ImageIcon className="w-4 h-4 text-primary" /> Photo
+                </button>
+                <button onClick={() => vidInputRef.current?.click()} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/60 text-sm text-foreground">
+                  <Film className="w-4 h-4 text-primary" /> Video
+                </button>
+                <button
+                  onClick={() => { setAttachOpen(false); recording ? stopRecording() : startRecording(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/60 text-sm text-foreground"
+                >
+                  {recording ? <Square className="w-4 h-4 text-red-500" /> : <Mic className="w-4 h-4 text-primary" />}
+                  {recording ? "Stop & send" : "Voice note"}
+                </button>
+              </div>
+            )}
+            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+              const f = e.target.files?.[0]; if (f) sendMedia(f, "image", f.name); e.target.value = "";
+            }} />
+            <input ref={vidInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => {
+              const f = e.target.files?.[0]; if (f) sendMedia(f, "video", f.name); e.target.value = "";
+            }} />
+          </div>
+
+          {recording && (
+            <button onClick={stopRecording} className="px-2 text-[11px] text-red-400 font-body animate-pulse">
+              ● recording — tap to stop
+            </button>
+          )}
+
           <textarea
             data-testid="input-chat-message"
             value={input}
@@ -302,10 +424,10 @@ export default function ChatBox() {
           <button
             data-testid="button-chat-send"
             onClick={handleSend}
-            disabled={!input.trim() || sendMutation.isPending}
+            disabled={!input.trim() || sendMutation.isPending || sendingMedia}
             className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-accent/80 flex items-center justify-center text-white disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all shrink-0 mb-0.5"
           >
-            {sendMutation.isPending
+            {sendMutation.isPending || sendingMedia
               ? <Loader2 className="w-4 h-4 animate-spin" />
               : <Send className="w-4 h-4" />
             }
