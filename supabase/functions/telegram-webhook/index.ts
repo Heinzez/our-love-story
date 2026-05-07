@@ -11,6 +11,16 @@ const TELEGRAM_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID") || "";
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+// In-memory dedup cache (5 min) to absorb retry storms
+const seenUpdates = new Map<number, number>();
+function alreadySeen(id: number): boolean {
+  const now = Date.now();
+  for (const [k, t] of seenUpdates) if (now - t > 5 * 60_000) seenUpdates.delete(k);
+  if (seenUpdates.has(id)) return true;
+  seenUpdates.set(id, now);
+  return false;
+}
+
 async function sendTelegram(text: string) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
   try {
@@ -29,6 +39,7 @@ serve(async (req) => {
     const message = update?.message ?? update?.edited_message;
     const updateId = update?.update_id;
     if (!message || typeof updateId !== "number") return new Response(JSON.stringify({ ok: true }));
+    if (alreadySeen(updateId)) return new Response(JSON.stringify({ ok: true, dedup: true }));
 
     const fromChatId = message?.chat?.id;
     // Persist for admin visibility (idempotent on update_id)

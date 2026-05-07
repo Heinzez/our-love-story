@@ -20,6 +20,7 @@ export interface PageImage {
   caption: string | null;
   sort_order: number;
   media_type?: string;
+  uploaded_by?: string;
   publicUrl: string;
 }
 
@@ -42,6 +43,7 @@ interface SiteContextType {
   setShowWelcomeNote: (v: boolean) => void;
   clearNewNote: () => void;
   refreshPageData: () => Promise<void>;
+  signOut: () => void;
 }
 
 const SiteContext = createContext<SiteContextType | null>(null);
@@ -67,7 +69,7 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
   const refreshPageData = async () => {
     const [{ data: settings }, { data: images }] = await Promise.all([
       supabase.from("page_settings").select("page_key, premiere_date, description"),
-      supabase.from("page_images").select("id, page_key, image_path, caption, sort_order, media_type").order("sort_order", { ascending: true }),
+      supabase.from("page_images").select("id, page_key, image_path, caption, sort_order, media_type, uploaded_by").order("sort_order", { ascending: true }).limit(2000),
     ]);
     if (settings) {
       const map: Record<string, PageSetting> = {};
@@ -91,14 +93,39 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
 
   const setAdminToken = (t: string | null) => {
     setAdminTokenState(t);
-    if (t) sessionStorage.setItem("queen-admin-token", t);
-    else sessionStorage.removeItem("queen-admin-token");
+    if (t) localStorage.setItem("queen-admin-token", t);
+    else localStorage.removeItem("queen-admin-token");
   };
 
+  // Restore session on mount
   useEffect(() => {
-    const t = sessionStorage.getItem("queen-admin-token");
+    const t = localStorage.getItem("queen-admin-token");
+    const auth = localStorage.getItem("queen-auth");
+    const role = localStorage.getItem("queen-role");
     if (t) setAdminTokenState(t);
+    if (auth === "1") {
+      setIsAuthenticated(true);
+      setIsAdmin(role === "admin");
+    }
   }, []);
+
+  // Idle auto-logout (2 min)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let timer: number | undefined;
+    const reset = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => signOut(), 2 * 60 * 1000);
+    };
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, reset));
+      if (timer) window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   useEffect(() => {
     setSubscribedEmailState(localStorage.getItem("queen-email"));
@@ -139,6 +166,8 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
   const handleSetAuthenticated = (v: boolean) => {
     setIsAuthenticated(v);
     if (v) {
+      localStorage.setItem("queen-auth", "1");
+      localStorage.setItem("queen-role", isAdmin ? "admin" : "viewer");
       const alreadyShown = sessionStorage.getItem("queen-note-shown") === "1";
       if (!alreadyShown) {
         if (!sessionStorage.getItem("queen-note-idx")) {
@@ -149,6 +178,22 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   };
+
+  const signOut = () => {
+    setIsAuthenticated(false);
+    setIsAdmin(false);
+    setAdminToken(null);
+    localStorage.removeItem("queen-auth");
+    localStorage.removeItem("queen-role");
+    sessionStorage.removeItem("queen-note-shown");
+  };
+
+  // Persist isAdmin changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      localStorage.setItem("queen-role", isAdmin ? "admin" : "viewer");
+    }
+  }, [isAdmin, isAuthenticated]);
 
   const saveNote = async (note: SavedNote) => {
     if (isAdmin) {
@@ -179,7 +224,7 @@ export const SiteProvider = ({ children }: { children: ReactNode }) => {
       pageSettings, pageImages, showWelcomeNote, hasNewNote,
       setIsAdmin, setIsAuthenticated: handleSetAuthenticated, setAdminToken,
       setSubscribedEmail: handleSetEmail,
-      saveNote, setShowWelcomeNote, clearNewNote, refreshPageData,
+      saveNote, setShowWelcomeNote, clearNewNote, refreshPageData, signOut,
     }}>
       {children}
     </SiteContext.Provider>

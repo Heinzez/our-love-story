@@ -59,6 +59,9 @@ export type Database = {
           date: string
           id: string
           is_ai: boolean
+          media_path: string | null
+          media_type: string | null
+          media_url: string | null
           page_key: string | null
           sender: string
           status: string
@@ -70,6 +73,9 @@ export type Database = {
           date: string
           id?: string
           is_ai?: boolean
+          media_path?: string | null
+          media_type?: string | null
+          media_url?: string | null
           page_key?: string | null
           sender: string
           status?: string
@@ -81,6 +87,9 @@ export type Database = {
           date?: string
           id?: string
           is_ai?: boolean
+          media_path?: string | null
+          media_type?: string | null
+          media_url?: string | null
           page_key?: string | null
           sender?: string
           status?: string
@@ -119,6 +128,7 @@ export type Database = {
           media_type: string
           page_key: string
           sort_order: number
+          uploaded_by: string
         }
         Insert: {
           caption?: string | null
@@ -128,6 +138,7 @@ export type Database = {
           media_type?: string
           page_key: string
           sort_order?: number
+          uploaded_by?: string
         }
         Update: {
           caption?: string | null
@@ -137,6 +148,7 @@ export type Database = {
           media_type?: string
           page_key?: string
           sort_order?: number
+          uploaded_by?: string
         }
         Relationships: []
       }

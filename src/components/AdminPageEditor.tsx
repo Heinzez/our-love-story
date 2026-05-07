@@ -67,27 +67,56 @@ const AdminPageEditor = () => {
     finally { setBusy(false); }
   };
 
-  const upload = async (file: File) => {
+  const [uploadProgress, setUploadProgress] = useState<{ name: string; pct: number; status: "pending" | "done" | "error"; file?: File }[]>([]);
+
+  const uploadOne = async (file: File, idx: number) => {
+    const isVideo = file.type.startsWith("video/");
+    if (isVideo && file.size > 40 * 1024 * 1024) throw new Error("Max 40MB per video.");
+    if (!isVideo && file.size > 6 * 1024 * 1024) throw new Error("Max 6MB per image.");
+    if (!isVideo && !file.type.startsWith("image/")) throw new Error("Only images or videos allowed.");
+    setUploadProgress((p) => p.map((it, i) => i === idx ? { ...it, pct: 20 } : it));
+    const base64 = await fileToBase64(file);
+    setUploadProgress((p) => p.map((it, i) => i === idx ? { ...it, pct: 60 } : it));
+    await call({
+      action: "upload-image",
+      pageKey: active,
+      fileName: file.name,
+      fileBase64: base64,
+      caption: caption || undefined,
+      mediaType: isVideo ? "video" : "image",
+      uploadedBy: "admin",
+    });
+    setUploadProgress((p) => p.map((it, i) => i === idx ? { ...it, pct: 100, status: "done" } : it));
+  };
+
+  const uploadMany = async (files: FileList) => {
+    const arr = Array.from(files);
+    setUploadProgress(arr.map((f) => ({ name: f.name, pct: 0, status: "pending" as const, file: f })));
     setBusy(true); setErr(null); setMsg(null);
-    try {
-      const isVideo = file.type.startsWith("video/");
-      if (isVideo && file.size > 40 * 1024 * 1024) throw new Error("Max 40MB per video.");
-      if (!isVideo && file.size > 6 * 1024 * 1024) throw new Error("Max 6MB per image.");
-      if (!isVideo && !file.type.startsWith("image/")) throw new Error("Only images or videos allowed.");
-      const base64 = await fileToBase64(file);
-      await call({
-        action: "upload-image",
-        pageKey: active,
-        fileName: file.name,
-        fileBase64: base64,
-        caption: caption || undefined,
-        mediaType: isVideo ? "video" : "image",
-      });
-      setMsg(isVideo ? "Video uploaded." : "Image uploaded.");
-      setCaption("");
-      await refreshPageData();
-    } catch (e) { setErr((e as Error).message); }
-    finally { setBusy(false); }
+    let successes = 0;
+    for (let i = 0; i < arr.length; i++) {
+      try { await uploadOne(arr[i], i); successes++; }
+      catch (e) {
+        setUploadProgress((p) => p.map((it, idx) => idx === i ? { ...it, status: "error", pct: 0 } : it));
+        setErr((e as Error).message);
+      }
+    }
+    if (successes > 0) setMsg(`${successes} uploaded.`);
+    setCaption("");
+    await refreshPageData();
+    setBusy(false);
+    setTimeout(() => setUploadProgress((p) => p.filter((it) => it.status === "error")), 2500);
+  };
+
+  const retryOne = async (idx: number) => {
+    const f = uploadProgress[idx]?.file;
+    if (!f) return;
+    setBusy(true);
+    try { await uploadOne(f, idx); await refreshPageData(); }
+    catch (e) {
+      setUploadProgress((p) => p.map((it, i) => i === idx ? { ...it, status: "error", pct: 0 } : it));
+      setErr((e as Error).message);
+    } finally { setBusy(false); }
   };
 
   const remove = async (id: string, path: string) => {
@@ -239,15 +268,33 @@ const AdminPageEditor = () => {
         />
         <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-primary/30 text-muted-foreground hover:text-foreground hover:border-primary/60 cursor-pointer transition-all">
           <Upload className="w-4 h-4" />
-          <span className="font-body text-sm">{busy ? "Uploading…" : "Upload image (≤6MB) or video (≤40MB)"}</span>
+          <span className="font-body text-sm">{busy ? "Uploading…" : "Upload (multiple ok) — image ≤6MB / video ≤40MB"}</span>
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+            multiple
             disabled={busy}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }}
+            onChange={(e) => { if (e.target.files && e.target.files.length) uploadMany(e.target.files); e.target.value = ""; }}
             className="hidden"
           />
         </label>
+        {uploadProgress.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            {uploadProgress.map((it, i) => (
+              <div key={i} className="text-[11px] font-body">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="truncate flex-1 text-muted-foreground">{it.name}</span>
+                  {it.status === "error"
+                    ? <button onClick={() => retryOne(i)} className="text-primary underline">Retry</button>
+                    : <span className="text-muted-foreground/60">{it.pct}%</span>}
+                </div>
+                <div className="h-1 rounded-full bg-muted/40 overflow-hidden">
+                  <div className={`h-full transition-all ${it.status === "error" ? "bg-red-500/70" : "bg-primary"}`} style={{ width: `${it.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {msg && <div className="flex items-center gap-2 text-primary text-sm mb-3"><Check className="w-4 h-4" />{msg}</div>}
@@ -256,6 +303,11 @@ const AdminPageEditor = () => {
       {/* Existing images */}
       <div>
         <p className="text-xs text-muted-foreground mb-2 font-body">{images.length} image{images.length === 1 ? "" : "s"} on this page</p>
+        {active === "landing" && (
+          <p className="text-[11px] text-muted-foreground/60 mb-3 font-body italic">
+            Note: 37 photos shipped with the original site are bundled assets (not in DB) — they appear on Home but not here. Only DB-uploaded media is editable.
+          </p>
+        )}
         {images.length === 0 ? (
           <p className="text-muted-foreground/60 text-sm py-4 text-center">No images yet — upload the first one above.</p>
         ) : (
