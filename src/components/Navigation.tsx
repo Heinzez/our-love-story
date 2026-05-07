@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Heart, BookOpen, Compass, Smile, Mail,
   Sparkles, ScrollText, Shield, Gift,
-  MoreHorizontal, FolderLock, Wallet,
+  MoreHorizontal, FolderLock, Wallet, LogOut,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 
@@ -18,7 +18,7 @@ const tabs = [
 ];
 
 const Navigation = () => {
-  const { isAdmin, hasNewNote, clearNewNote } = useSite();
+  const { isAdmin, hasNewNote, clearNewNote, signOut } = useSite();
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -181,6 +181,15 @@ const Navigation = () => {
                       )}
                     </div>
                   ))}
+                  <div className="h-px bg-border/30 my-1" />
+                  <button
+                    onClick={() => { setMoreOpen(false); signOut(); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-body hover:bg-white/5 transition-colors text-left"
+                    style={{ color: "hsl(30 10% 75%)" }}
+                  >
+                    <LogOut className="w-4 h-4 text-primary/80" />
+                    <span className="flex-1">Sign out</span>
+                  </button>
                 </div>
               )}
             </div>
