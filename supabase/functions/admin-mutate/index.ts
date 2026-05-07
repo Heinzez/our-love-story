@@ -80,7 +80,7 @@ serve(async (req) => {
     }
 
     if (action === "upload-image") {
-      const { pageKey, fileName, fileBase64, caption, mediaType } = body;
+      const { pageKey, fileName, fileBase64, caption, mediaType, uploadedBy } = body;
       if (!PAGE_KEYS.has(pageKey)) return json({ error: "Invalid page" }, 400);
       if (typeof fileBase64 !== "string" || !fileName) return json({ error: "Missing file" }, 400);
       const ext = String(fileName).split(".").pop()?.toLowerCase() || "jpg";
@@ -106,8 +106,14 @@ serve(async (req) => {
         media_type: isVideo ? "video" : "image",
       });
       if (insErr) throw insErr;
+      // Determine uploader: only mark "her" when explicitly stated AND no admin token
+      // (admin can also upload from public form but should be tagged 'admin')
+      const tokenOk = await verifyAdmin(token);
+      const uploader = tokenOk ? "admin" : (uploadedBy === "her" ? "her" : "her");
+      // Update row with uploader (insert above didn't include it; do an update keyed by path)
+      await supabase.from("page_images").update({ uploaded_by: uploader }).eq("image_path", path);
       const { data: pub } = supabase.storage.from("premiere-media").getPublicUrl(path);
-      return json({ ok: true, url: pub.publicUrl, path, mediaType: isVideo ? "video" : "image" });
+      return json({ ok: true, url: pub.publicUrl, path, mediaType: isVideo ? "video" : "image", uploadedBy: uploader });
     }
 
     if (action === "delete-image") {
