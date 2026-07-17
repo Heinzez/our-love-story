@@ -163,6 +163,72 @@ serve(async (req) => {
       return json({ ok: true, notified: emails.length, recipients: emails });
     }
 
+    // ─── Payment methods CRUD (admin only) ───
+    if (action === "payment-upsert") {
+      const { id, kind, label, account_name, account_value, instructions, deep_link, icon, sort_order, is_active } = body;
+      if (!kind || !label || !account_value) return json({ error: "Missing fields" }, 400);
+      const row: Record<string, unknown> = {
+        kind: String(kind).slice(0, 20),
+        label: String(label).slice(0, 60),
+        account_name: account_name ? String(account_name).slice(0, 80) : null,
+        account_value: String(account_value).slice(0, 200),
+        instructions: instructions ? String(instructions).slice(0, 400) : null,
+        deep_link: deep_link ? String(deep_link).slice(0, 400) : null,
+        icon: icon ? String(icon).slice(0, 40) : null,
+        sort_order: typeof sort_order === "number" ? sort_order : 0,
+        is_active: is_active !== false,
+        updated_at: new Date().toISOString(),
+      };
+      if (id) {
+        const { error } = await supabase.from("payment_methods").update(row).eq("id", id);
+        if (error) throw error;
+        return json({ ok: true, id });
+      }
+      const { data, error } = await supabase.from("payment_methods").insert(row).select("id").single();
+      if (error) throw error;
+      return json({ ok: true, id: data?.id });
+    }
+
+    if (action === "payment-delete") {
+      const { id } = body;
+      if (!id) return json({ error: "Missing id" }, 400);
+      const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    // ─── Manual entries CRUD (admin only) ───
+    if (action === "manual-upsert") {
+      const { id, title, category, body: mBody, steps, tags, sort_order, is_published } = body;
+      if (!title || !mBody) return json({ error: "Missing fields" }, 400);
+      const row: Record<string, unknown> = {
+        title: String(title).slice(0, 120),
+        category: category ? String(category).slice(0, 60) : null,
+        body: String(mBody).slice(0, 20000),
+        steps: Array.isArray(steps) ? steps.slice(0, 40) : null,
+        tags: Array.isArray(tags) ? tags.slice(0, 12).map((t: unknown) => String(t).slice(0, 30)) : null,
+        sort_order: typeof sort_order === "number" ? sort_order : 0,
+        is_published: is_published !== false,
+        updated_at: new Date().toISOString(),
+      };
+      if (id) {
+        const { error } = await supabase.from("manual_entries").update(row).eq("id", id);
+        if (error) throw error;
+        return json({ ok: true, id });
+      }
+      const { data, error } = await supabase.from("manual_entries").insert(row).select("id").single();
+      if (error) throw error;
+      return json({ ok: true, id: data?.id });
+    }
+
+    if (action === "manual-delete") {
+      const { id } = body;
+      if (!id) return json({ error: "Missing id" }, 400);
+      const { error } = await supabase.from("manual_entries").delete().eq("id", id);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
     return json({ error: "Unknown action" }, 400);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
