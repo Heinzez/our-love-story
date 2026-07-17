@@ -20,6 +20,7 @@ import GoalsPage from "@/pages/GoalsPage";
 import MyNotesPage from "@/pages/MyNotesPage";
 import GiftPage from "@/pages/GiftPage";
 import AdminPage from "@/pages/AdminPage";
+import ManualPage from "@/pages/ManualPage";
 import NotFound from "@/pages/NotFound";
 import { useCallback, useState } from "react";
 
@@ -53,6 +54,7 @@ const AuthenticatedApp = (): JSX.Element => {
         <Route path="/my-notes" element={<MyNotesPage />} />
         <Route path="/gift" element={<GiftPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/the-manual" element={<ManualPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

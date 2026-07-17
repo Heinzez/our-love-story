@@ -23,6 +23,23 @@ const Navigation = () => {
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const clickCountRef = useRef(0);
+  const clickTimerRef = useRef<number | null>(null);
+
+  // Secret: 5 rapid clicks on the heart-logo → open THE MANUAL.
+  const handleLogoClick = () => {
+    clickCountRef.current += 1;
+    if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = window.setTimeout(() => {
+      clickCountRef.current = 0;
+    }, 1200);
+    if (clickCountRef.current >= 5) {
+      clickCountRef.current = 0;
+      navigate("/the-manual");
+      return;
+    }
+    if (clickCountRef.current === 1) navigate("/");
+  };
 
   useEffect(() => {
     if (location.pathname === "/my-notes" && hasNewNote) clearNewNote();
@@ -64,7 +81,8 @@ const Navigation = () => {
 
             {/* Logo */}
             <button
-              onClick={() => navigate("/")}
+              onClick={handleLogoClick}
+              aria-label="Home"
               className="flex items-center gap-2.5 shrink-0 group"
             >
               <div className="relative">
