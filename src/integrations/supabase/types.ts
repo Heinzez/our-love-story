@@ -119,6 +119,45 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_entries: {
+        Row: {
+          body: string
+          category: string | null
+          created_at: string
+          id: string
+          is_published: boolean
+          sort_order: number
+          steps: Json | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          sort_order?: number
+          steps?: Json | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          sort_order?: number
+          steps?: Json | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       page_images: {
         Row: {
           caption: string | null
@@ -169,6 +208,51 @@ export type Database = {
           description?: string | null
           page_key?: string
           premiere_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payment_methods: {
+        Row: {
+          account_name: string | null
+          account_value: string
+          created_at: string
+          deep_link: string | null
+          icon: string | null
+          id: string
+          instructions: string | null
+          is_active: boolean
+          kind: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_value: string
+          created_at?: string
+          deep_link?: string | null
+          icon?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          kind: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string | null
+          account_value?: string
+          created_at?: string
+          deep_link?: string | null
+          icon?: string | null
+          id?: string
+          instructions?: string | null
+          is_active?: boolean
+          kind?: string
+          label?: string
+          sort_order?: number
           updated_at?: string
         }
         Relationships: []
