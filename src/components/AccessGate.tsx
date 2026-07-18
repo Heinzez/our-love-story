@@ -9,29 +9,51 @@ const AccessGate = () => {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [retryStatus, setRetryStatus] = useState<string>("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError("");
+    setRetryStatus("");
 
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('validate-access', {
-        body: { answer: answer.trim() },
-      });
+    // Retry with exponential backoff for transient 521/503/network errors so the
+    // gate never stays blank while Lovable Cloud is warming up.
+    const maxAttempts = 5;
+    let lastErr: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("validate-access", {
+          body: { answer: answer.trim() },
+        });
+        if (fnError) throw fnError;
 
-      if (fnError) throw fnError;
-
-      if (data?.authenticated) {
-        setIsAdmin(data.role === 'admin');
-        setAdminToken(data.adminToken ?? null);
-        setIsAuthenticated(true);
-      } else {
+        if (data?.authenticated) {
+          setIsAdmin(data.role === "admin");
+          setAdminToken(data.adminToken ?? null);
+          setIsAuthenticated(true);
+          return;
+        }
         setError("Incorrect answer. Please try again.");
         setIsSubmitting(false);
+        return;
+      } catch (err) {
+        lastErr = err;
+        const msg = err instanceof Error ? err.message.toLowerCase() : "";
+        const transient =
+          msg.includes("521") || msg.includes("503") || msg.includes("504") ||
+          msg.includes("timeout") || msg.includes("network") || msg.includes("failed to fetch") ||
+          msg.includes("non-2xx");
+        if (!transient || attempt === maxAttempts) break;
+        const wait = Math.min(4000, 500 * 2 ** (attempt - 1));
+        setRetryStatus(`Backend warming up… retrying (${attempt}/${maxAttempts})`);
+        await new Promise((r) => setTimeout(r, wait));
       }
-    } catch (err) {
-      setError("Something went wrong. Please try again.");
-      setIsSubmitting(false);
     }
+    console.error("validate-access failed after retries:", lastErr);
+    setError("Backend is waking up. Please try again in a moment.");
+    setRetryStatus("");
+    setIsSubmitting(false);
   };
 
   return (
@@ -92,6 +114,11 @@ const AccessGate = () => {
                   <div className="flex items-center gap-2 text-accent text-sm mt-2 animate-fade-in-up">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     <span>{error}</span>
+                  </div>
+                )}
+                {retryStatus && !error && (
+                  <div className="text-xs text-muted-foreground/70 mt-2 animate-fade-in-up">
+                    {retryStatus}
                   </div>
                 )}
               </div>

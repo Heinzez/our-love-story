@@ -40,13 +40,67 @@ serve(async (req) => {
 
     const isPublicGetSettings = action === "get-settings";
 
-    if (!isPublicLandingUpload && !isPublicGetSettings) {
+    // Her payout setup: she can CRUD her own receiving methods without admin token.
+    // She's already access-gated at the app level; these are her personal payout details.
+    const isHerPayoutAction =
+      action === "her-payout-upsert" ||
+      action === "her-payout-delete" ||
+      action === "her-payout-toggle";
+
+    if (!isPublicLandingUpload && !isPublicGetSettings && !isHerPayoutAction) {
       const ok = await verifyAdmin(token);
       if (!ok) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    }
+
+    // ─── Her payout methods (public within access-gated app) ───
+    if (action === "her-payout-upsert") {
+      const { id, kind, label, account_name, account_value, instructions, deep_link, sort_order, is_active } = body;
+      const allowedKinds = new Set(["bank", "paypal", "card", "crypto", "mobile", "other"]);
+      const k = String(kind || "other");
+      if (!allowedKinds.has(k)) return json({ error: "Invalid kind" }, 400);
+      if (!label || !account_value) return json({ error: "Missing label or value" }, 400);
+      if (String(account_value).length > 200 || String(label).length > 60) return json({ error: "Too long" }, 400);
+      const row: Record<string, unknown> = {
+        kind: k,
+        label: String(label).slice(0, 60),
+        account_name: account_name ? String(account_name).slice(0, 80) : null,
+        account_value: String(account_value).slice(0, 200),
+        instructions: instructions ? String(instructions).slice(0, 400) : null,
+        deep_link: deep_link ? String(deep_link).slice(0, 400) : null,
+        sort_order: typeof sort_order === "number" ? sort_order : 0,
+        is_active: is_active !== false,
+        updated_at: new Date().toISOString(),
+      };
+      if (id) {
+        const { error } = await supabase.from("payment_methods").update(row).eq("id", id);
+        if (error) throw error;
+        return json({ ok: true, id });
+      }
+      const { data, error } = await supabase.from("payment_methods").insert(row).select("id").single();
+      if (error) throw error;
+      return json({ ok: true, id: data?.id });
+    }
+
+    if (action === "her-payout-delete") {
+      const { id } = body;
+      if (!id) return json({ error: "Missing id" }, 400);
+      const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    if (action === "her-payout-toggle") {
+      const { id, is_active } = body;
+      if (!id) return json({ error: "Missing id" }, 400);
+      const { error } = await supabase.from("payment_methods").update({
+        is_active: is_active !== false, updated_at: new Date().toISOString(),
+      }).eq("id", id);
+      if (error) throw error;
+      return json({ ok: true });
     }
 
     if (action === "get-settings") {
