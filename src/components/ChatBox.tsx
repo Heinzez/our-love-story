@@ -314,7 +314,7 @@ export default function ChatBox() {
         {/* Messages area */}
         <div
           className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
-          style={{ background: "hsl(var(--background))" }}
+          style={{ background: "linear-gradient(180deg, hsl(340 18% 7% / 0.35), hsl(340 18% 5% / 0.55))" }}
         >
           {isLoading && (
             <div className="flex justify-center pt-8">
@@ -343,45 +343,85 @@ export default function ChatBox() {
                 // isMine = message sent by the current viewer
                 const isMine = isAdmin ? m.sender === "me" : m.sender === "her";
                 const isSeenByOther = m.status === "seen";
+                const reactions = m.reactions || {};
+                const reactionEntries = Object.entries(reactions).filter(([, v]) => (v as string[]).length > 0);
 
                 return (
                   <div
                     key={m.id}
                     data-testid={`message-${m.sender}-${m.id}`}
-                    className={`flex mb-2 ${isMine ? "justify-end" : "justify-start"}`}
+                    className={`group flex mb-3 ${isMine ? "justify-end" : "justify-start"}`}
                   >
-                    <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm font-body leading-relaxed ${
-                      isMine
-                        ? "bg-gradient-to-br from-primary/80 to-primary/60 text-white rounded-br-sm"
-                        : "bg-card border border-border/60 text-foreground rounded-bl-sm"
-                    }`}>
-                      {m.isAi && (
-                        <span className="text-[10px] opacity-50 block mb-0.5">✨ auto-reply</span>
-                      )}
-                      {m.mediaUrl && m.mediaType === "image" && (
-                        <img src={m.mediaUrl} alt="" className="rounded-lg max-w-full mb-1.5" />
-                      )}
-                      {m.mediaUrl && m.mediaType === "video" && (
-                        <video src={m.mediaUrl} controls className="rounded-lg max-w-full mb-1.5" />
-                      )}
-                      {m.mediaUrl && m.mediaType === "audio" && (
-                        <audio src={m.mediaUrl} controls className="w-full mb-1.5" />
-                      )}
-                      {m.text && <p>{m.text}</p>}
-                      <div className={`flex items-center gap-1 mt-1 justify-end ${isMine ? "text-white/50" : "text-muted-foreground/50"}`}>
-                        <span className="text-[10px]">{formatTime(m.createdAt as unknown as string)}</span>
-                        {isMine && (
-                          <span className={`text-[10px] font-medium ${isSeenByOther ? "text-blue-300" : ""}`}>
-                            {STATUS_ICONS[m.status] || "✓"}
-                          </span>
-                        )}
+                    <div className="relative max-w-[80%]">
+                      <div className={`relative liquid-sheen px-3.5 py-2.5 text-sm font-body leading-relaxed whitespace-pre-wrap break-words ${
+                        isMine ? "rounded-2xl rounded-br-sm text-white" : "rounded-2xl rounded-bl-sm text-foreground"
+                      }`}
+                      style={isMine ? {
+                        background: "linear-gradient(135deg, hsl(338 80% 62% / 0.9), hsl(315 45% 58% / 0.75))",
+                        border: "1px solid hsl(0 0% 100% / 0.14)",
+                        boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.2), 0 8px 24px -12px hsl(338 80% 40% / 0.6)",
+                      } : {
+                        background: "linear-gradient(135deg, hsl(0 0% 100% / 0.06), hsl(340 12% 16% / 0.7))",
+                        backdropFilter: "blur(18px) saturate(1.4)",
+                        border: "1px solid hsl(0 0% 100% / 0.08)",
+                        boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.08)",
+                      }}>
+                        {m.isAi && (<span className="text-[10px] opacity-60 block mb-0.5">✨ auto-reply</span>)}
+                        {m.mediaUrl && m.mediaType === "image" && (<img src={m.mediaUrl} alt="" className="rounded-lg max-w-full mb-1.5" loading="lazy" />)}
+                        {m.mediaUrl && m.mediaType === "video" && (<video src={m.mediaUrl} controls className="rounded-lg max-w-full mb-1.5" />)}
+                        {m.mediaUrl && m.mediaType === "audio" && (<audio src={m.mediaUrl} controls className="w-full mb-1.5" />)}
+                        {m.text && <p className="break-words">{m.text}</p>}
+                        <div className={`flex items-center gap-1 mt-1 justify-end ${isMine ? "text-white/60" : "text-muted-foreground/60"}`}>
+                          <span className="text-[10px]">{formatTime(m.createdAt as unknown as string)}</span>
+                          {isMine && (
+                            <span className={`text-[10px] font-medium ${isSeenByOther ? "text-sky-200" : ""}`}>
+                              {STATUS_ICONS[m.status] || "✓"}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {reactionEntries.length > 0 && (
+                        <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                          {reactionEntries.map(([emoji, arr]) => (
+                            <button key={emoji} onClick={() => reactMutation.mutate({ messageId: m.id, emoji })}
+                              className="px-1.5 py-0.5 rounded-full text-[11px] backdrop-blur bg-white/10 border border-white/15 hover:bg-white/20 transition-colors">
+                              {emoji} <span className="text-white/70">{(arr as string[]).length}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setReactingFor(reactingFor === m.id ? null : m.id)}
+                        className={`absolute -top-2 ${isMine ? "-left-2" : "-right-2"} opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-6 h-6 rounded-full liquid-glass-soft flex items-center justify-center`}
+                        aria-label="React"
+                      >
+                        <SmilePlus className="w-3 h-3 text-white/80" />
+                      </button>
+                      {reactingFor === m.id && (
+                        <div className={`absolute z-20 top-full mt-1 ${isMine ? "right-0" : "left-0"} flex gap-0.5 p-1.5 rounded-2xl liquid-glass-strong border border-white/10 shadow-xl`}>
+                          {REACTION_EMOJIS.map((e) => (
+                            <button key={e} onClick={() => reactMutation.mutate({ messageId: m.id, emoji: e })}
+                              className="w-7 h-7 rounded-full hover:bg-white/15 flex items-center justify-center text-base transition-transform hover:scale-125">
+                              {e}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
           ))}
+          {showTyping && (
+            <div className="flex justify-start mb-2">
+              <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm liquid-glass-soft border border-white/10 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" style={{ animationDelay: "120ms" }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" style={{ animationDelay: "240ms" }} />
+              </div>
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
 
