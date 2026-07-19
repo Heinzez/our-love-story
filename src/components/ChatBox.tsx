@@ -89,6 +89,8 @@ export default function ChatBox() {
   const [unread, setUnread] = useState(0);
   const [pollMs, setPollMs] = useState(4000);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [reactingFor, setReactingFor] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [sendingMedia, setSendingMedia] = useState(false);
   const mediaRecRef = useRef<MediaRecorder | null>(null);
@@ -125,6 +127,17 @@ export default function ChatBox() {
       // Back off on rate limit
       if (/slow down/i.test(e.message) || /429/.test(e.message)) setPollMs((p) => Math.min(p * 2, 30000));
     },
+  });
+
+  const reactMutation = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      const { data, error } = await supabase.functions.invoke("chat", {
+        body: { action: "react", messageId, emoji, who: isAdmin ? "me" : "her" },
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["chat-messages"] }); setReactingFor(null); },
   });
 
   const fileToBase64 = (file: Blob): Promise<string> =>
@@ -244,6 +257,7 @@ export default function ChatBox() {
   };
 
   const grouped = groupByDay(messages);
+  const showTyping = sendMutation.isPending || sendingMedia;
 
   return (
     <>
