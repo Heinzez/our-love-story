@@ -63,6 +63,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           page_key: string | null
+          reactions: Json
           sender: string
           status: string
           telegram_message_id: number | null
@@ -77,6 +78,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           page_key?: string | null
+          reactions?: Json
           sender: string
           status?: string
           telegram_message_id?: number | null
@@ -91,6 +93,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           page_key?: string | null
+          reactions?: Json
           sender?: string
           status?: string
           telegram_message_id?: number | null
@@ -155,6 +158,39 @@ export type Database = {
           tags?: string[] | null
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      notification_runs: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          page_key: string
+          premiere_date: string | null
+          recipients: Json
+          recipients_count: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          page_key: string
+          premiere_date?: string | null
+          recipients?: Json
+          recipients_count?: number
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          page_key?: string
+          premiere_date?: string | null
+          recipients?: Json
+          recipients_count?: number
+          status?: string
         }
         Relationships: []
       }
