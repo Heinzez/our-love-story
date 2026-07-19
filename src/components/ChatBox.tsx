@@ -265,7 +265,7 @@ export default function ChatBox() {
       <button
         data-testid="button-chat-open"
         onClick={() => setOpen(true)}
-        className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-accent/80 shadow-lg shadow-primary/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+        className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full liquid-glass-strong liquid-sheen shadow-lg shadow-primary/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       >
         <MessageCircleHeart className="w-6 h-6 text-white" />
         {unread > 0 && (
@@ -277,7 +277,7 @@ export default function ChatBox() {
 
       {/* Chat window — anchored bottom-left */}
       <div
-        className={`fixed bottom-0 left-0 z-50 flex flex-col transition-all duration-400 ease-out
+        className={`fixed bottom-0 left-0 z-50 flex flex-col transition-all duration-400 ease-out liquid-glass-strong
           ${open
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-8 pointer-events-none"
@@ -288,7 +288,7 @@ export default function ChatBox() {
         style={{ height: open ? "min(560px, 85vh)" : "0px" }}
       >
         {/* Header */}
-        <div className="relative flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-primary/90 to-accent/70 backdrop-blur-xl shrink-0">
+        <div className="relative flex items-center gap-3 px-5 py-4 shrink-0 border-b border-white/10 bg-gradient-to-r from-primary/40 via-accent/25 to-transparent">
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
             <Heart className="w-4 h-4 text-white fill-white" />
           </div>
@@ -297,7 +297,8 @@ export default function ChatBox() {
               Talk to me 💕
               {isAdmin && <ShieldCheck className="w-3.5 h-3.5 text-white/70" />}
             </p>
-            <p className="text-white/60 text-[11px] font-body">
+            <p className="text-white/60 text-[11px] font-body flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400/60 animate-pulse" />
               {isAdmin ? "Admin — replying as Mr.Mwendwa" : "I'm always listening"}
             </p>
           </div>
