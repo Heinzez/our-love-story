@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Shield, Mail, Lock, Unlock, Users, Gift, Send,
-  Loader2, Check, ChevronDown, ChevronUp, Info, MessageCircle, RefreshCw,
+  Loader2, Check, ChevronDown, ChevronUp, Info, MessageCircle, RefreshCw, Activity, PlayCircle, X,
 } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import AdminPageEditor from "@/components/AdminPageEditor";
@@ -46,6 +46,36 @@ const AdminPage = () => {
   const [tgBusy, setTgBusy] = useState(false);
   const [tgErr, setTgErr] = useState<string | null>(null);
   const [tgMsg, setTgMsg] = useState<string | null>(null);
+  const [selfTest, setSelfTest] = useState<{ ok: boolean; steps: { name: string; ok: boolean; ms: number; detail?: string }[]; ranAt?: string } | null>(null);
+  const [selfTestBusy, setSelfTestBusy] = useState(false);
+  const [selfTestErr, setSelfTestErr] = useState<string | null>(null);
+
+  const runSelfTest = async () => {
+    setSelfTestBusy(true); setSelfTestErr(null); setSelfTest(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("self-test", {
+        body: {},
+        headers: adminToken ? { "x-admin-token": adminToken } : undefined,
+      });
+      if (error) throw new Error(error.message);
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      setSelfTest(data as typeof selfTest);
+    } catch (e) { setSelfTestErr((e as Error).message); }
+    finally { setSelfTestBusy(false); }
+  };
+
+  const { data: notificationRuns = [] } = useQuery({
+    queryKey: ["notification-runs"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("notification_runs")
+        .select("id, page_key, premiere_date, recipients_count, status, note, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return data ?? [];
+    },
+    enabled: isAdmin,
+  });
 
   const callTg = async (action: "status" | "register") => {
     setTgBusy(true); setTgErr(null); setTgMsg(null);
@@ -173,6 +203,69 @@ const AdminPage = () => {
               )}
               <p className="text-muted-foreground/50 text-[11px] font-body">Reply on Telegram with <code>/reply your message</code> to send messages back into the site chat.</p>
             </div>
+          </Section>
+
+          {/* Self-test */}
+          <Section title="One-Click Self-Test" icon={PlayCircle} defaultOpen={false}>
+            <div className="space-y-3">
+              <p className="text-muted-foreground text-xs font-body">
+                Runs chat send → admin reply → media upload → admin preview → Telegram status, in sequence. Cleans up after itself.
+              </p>
+              <button
+                onClick={runSelfTest}
+                disabled={selfTestBusy}
+                className="px-4 py-2 rounded-xl text-sm font-display text-primary-foreground disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, hsl(338 80% 58%), hsl(355 70% 62%))" }}
+              >
+                {selfTestBusy ? <><Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1.5" /> Running…</> : <><PlayCircle className="w-3.5 h-3.5 inline mr-1.5" /> Run self-test</>}
+              </button>
+              {selfTestErr && <p className="text-red-400/80 text-sm">{selfTestErr}</p>}
+              {selfTest && (
+                <div className="rounded-xl bg-muted/20 border border-border/30 divide-y divide-border/30 overflow-hidden">
+                  <div className={`px-3 py-2 text-xs font-display flex items-center justify-between ${selfTest.ok ? "text-emerald-400" : "text-red-400"}`}>
+                    <span>{selfTest.ok ? "All checks passed" : "Some checks failed"}</span>
+                    <span className="text-muted-foreground/60">{selfTest.ranAt && new Date(selfTest.ranAt).toLocaleTimeString()}</span>
+                  </div>
+                  {selfTest.steps.map((s, i) => (
+                    <div key={i} className="px-3 py-2 flex items-start gap-2 text-xs font-body">
+                      {s.ok
+                        ? <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                        : <X className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-foreground">{s.name} <span className="text-muted-foreground/50">· {s.ms}ms</span></p>
+                        {s.detail && <p className="text-muted-foreground/60 truncate">{s.detail}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Section>
+
+          {/* Notification runs history */}
+          <Section title="Premiere Notification Runs" icon={Activity} defaultOpen={false}>
+            {notificationRuns.length === 0 ? (
+              <p className="text-muted-foreground/60 text-sm font-body text-center py-4">
+                No premiere notifications have been sent yet.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {notificationRuns.map((r: any) => (
+                  <div key={r.id} className="px-4 py-3 rounded-xl font-body text-sm flex items-center justify-between gap-3"
+                    style={{ background: "hsl(0 0% 100% / 0.02)", border: "1px solid hsl(338 80% 62% / 0.08)" }}>
+                    <div className="min-w-0">
+                      <p className="text-foreground capitalize">{String(r.page_key).replace(/-/g, " ")}</p>
+                      <p className="text-muted-foreground/60 text-xs">
+                        {new Date(r.created_at).toLocaleString()} · {r.recipients_count} recipient{r.recipients_count === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full ${r.status === "ok" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                      {r.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Section>
 
           {/* Gift Settings */}
