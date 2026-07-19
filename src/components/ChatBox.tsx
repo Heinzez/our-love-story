@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck, Paperclip, Mic, Image as ImageIcon, Film, Square } from "lucide-react";
+import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck, Paperclip, Mic, Image as ImageIcon, Film, Square, Smile, SmilePlus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSite } from "@/context/SiteContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ type ChatMessage = {
   createdAt: string;
   mediaUrl?: string | null;
   mediaType?: string | null;
+  reactions?: Record<string, string[]>;
 };
 
 // ── Status display ────────────────────────────────────────────
@@ -22,6 +23,9 @@ const STATUS_ICONS: Record<string, string> = {
   delivered: "✓✓",
   seen: "✓✓",
 };
+
+const REACTION_EMOJIS = ["❤️", "😂", "🥺", "🔥", "🌹", "😍", "👀", "🙌"];
+const EMOJI_PANEL = ["❤️","😂","🥺","🔥","🌹","😍","👀","🙌","💍","✨","💕","💌","🤍","😘","🥰","😌","🙈","💫","🌙","☕","🍷","🌸","💖","🫶"];
 
 function groupByDay(messages: ChatMessage[]) {
   const groups: Record<string, ChatMessage[]> = {};
@@ -85,6 +89,8 @@ export default function ChatBox() {
   const [unread, setUnread] = useState(0);
   const [pollMs, setPollMs] = useState(4000);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [reactingFor, setReactingFor] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [sendingMedia, setSendingMedia] = useState(false);
   const mediaRecRef = useRef<MediaRecorder | null>(null);
@@ -121,6 +127,17 @@ export default function ChatBox() {
       // Back off on rate limit
       if (/slow down/i.test(e.message) || /429/.test(e.message)) setPollMs((p) => Math.min(p * 2, 30000));
     },
+  });
+
+  const reactMutation = useMutation({
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      const { data, error } = await supabase.functions.invoke("chat", {
+        body: { action: "react", messageId, emoji, who: isAdmin ? "me" : "her" },
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["chat-messages"] }); setReactingFor(null); },
   });
 
   const fileToBase64 = (file: Blob): Promise<string> =>
@@ -240,6 +257,7 @@ export default function ChatBox() {
   };
 
   const grouped = groupByDay(messages);
+  const showTyping = sendMutation.isPending || sendingMedia;
 
   return (
     <>
@@ -247,7 +265,7 @@ export default function ChatBox() {
       <button
         data-testid="button-chat-open"
         onClick={() => setOpen(true)}
-        className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-accent/80 shadow-lg shadow-primary/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+        className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full liquid-glass-strong liquid-sheen shadow-lg shadow-primary/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       >
         <MessageCircleHeart className="w-6 h-6 text-white" />
         {unread > 0 && (
@@ -259,7 +277,7 @@ export default function ChatBox() {
 
       {/* Chat window — anchored bottom-left */}
       <div
-        className={`fixed bottom-0 left-0 z-50 flex flex-col transition-all duration-400 ease-out
+        className={`fixed bottom-0 left-0 z-50 flex flex-col transition-all duration-400 ease-out liquid-glass-strong
           ${open
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-8 pointer-events-none"
@@ -270,7 +288,7 @@ export default function ChatBox() {
         style={{ height: open ? "min(560px, 85vh)" : "0px" }}
       >
         {/* Header */}
-        <div className="relative flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-primary/90 to-accent/70 backdrop-blur-xl shrink-0">
+        <div className="relative flex items-center gap-3 px-5 py-4 shrink-0 border-b border-white/10 bg-gradient-to-r from-primary/40 via-accent/25 to-transparent">
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
             <Heart className="w-4 h-4 text-white fill-white" />
           </div>
@@ -279,7 +297,8 @@ export default function ChatBox() {
               Talk to me 💕
               {isAdmin && <ShieldCheck className="w-3.5 h-3.5 text-white/70" />}
             </p>
-            <p className="text-white/60 text-[11px] font-body">
+            <p className="text-white/60 text-[11px] font-body flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400/60 animate-pulse" />
               {isAdmin ? "Admin — replying as Mr.Mwendwa" : "I'm always listening"}
             </p>
           </div>
@@ -295,7 +314,7 @@ export default function ChatBox() {
         {/* Messages area */}
         <div
           className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
-          style={{ background: "hsl(var(--background))" }}
+          style={{ background: "linear-gradient(180deg, hsl(340 18% 7% / 0.35), hsl(340 18% 5% / 0.55))" }}
         >
           {isLoading && (
             <div className="flex justify-center pt-8">
@@ -324,64 +343,114 @@ export default function ChatBox() {
                 // isMine = message sent by the current viewer
                 const isMine = isAdmin ? m.sender === "me" : m.sender === "her";
                 const isSeenByOther = m.status === "seen";
+                const reactions = m.reactions || {};
+                const reactionEntries = Object.entries(reactions).filter(([, v]) => (v as string[]).length > 0);
 
                 return (
                   <div
                     key={m.id}
                     data-testid={`message-${m.sender}-${m.id}`}
-                    className={`flex mb-2 ${isMine ? "justify-end" : "justify-start"}`}
+                    className={`group flex mb-3 ${isMine ? "justify-end" : "justify-start"}`}
                   >
-                    <div className={`max-w-[78%] px-3.5 py-2.5 rounded-2xl text-sm font-body leading-relaxed ${
-                      isMine
-                        ? "bg-gradient-to-br from-primary/80 to-primary/60 text-white rounded-br-sm"
-                        : "bg-card border border-border/60 text-foreground rounded-bl-sm"
-                    }`}>
-                      {m.isAi && (
-                        <span className="text-[10px] opacity-50 block mb-0.5">✨ auto-reply</span>
-                      )}
-                      {m.mediaUrl && m.mediaType === "image" && (
-                        <img src={m.mediaUrl} alt="" className="rounded-lg max-w-full mb-1.5" />
-                      )}
-                      {m.mediaUrl && m.mediaType === "video" && (
-                        <video src={m.mediaUrl} controls className="rounded-lg max-w-full mb-1.5" />
-                      )}
-                      {m.mediaUrl && m.mediaType === "audio" && (
-                        <audio src={m.mediaUrl} controls className="w-full mb-1.5" />
-                      )}
-                      {m.text && <p>{m.text}</p>}
-                      <div className={`flex items-center gap-1 mt-1 justify-end ${isMine ? "text-white/50" : "text-muted-foreground/50"}`}>
-                        <span className="text-[10px]">{formatTime(m.createdAt as unknown as string)}</span>
-                        {isMine && (
-                          <span className={`text-[10px] font-medium ${isSeenByOther ? "text-blue-300" : ""}`}>
-                            {STATUS_ICONS[m.status] || "✓"}
-                          </span>
-                        )}
+                    <div className="relative max-w-[80%]">
+                      <div className={`relative liquid-sheen px-3.5 py-2.5 text-sm font-body leading-relaxed whitespace-pre-wrap break-words ${
+                        isMine ? "rounded-2xl rounded-br-sm text-white" : "rounded-2xl rounded-bl-sm text-foreground"
+                      }`}
+                      style={isMine ? {
+                        background: "linear-gradient(135deg, hsl(338 80% 62% / 0.9), hsl(315 45% 58% / 0.75))",
+                        border: "1px solid hsl(0 0% 100% / 0.14)",
+                        boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.2), 0 8px 24px -12px hsl(338 80% 40% / 0.6)",
+                      } : {
+                        background: "linear-gradient(135deg, hsl(0 0% 100% / 0.06), hsl(340 12% 16% / 0.7))",
+                        backdropFilter: "blur(18px) saturate(1.4)",
+                        border: "1px solid hsl(0 0% 100% / 0.08)",
+                        boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.08)",
+                      }}>
+                        {m.isAi && (<span className="text-[10px] opacity-60 block mb-0.5">✨ auto-reply</span>)}
+                        {m.mediaUrl && m.mediaType === "image" && (<img src={m.mediaUrl} alt="" className="rounded-lg max-w-full mb-1.5" loading="lazy" />)}
+                        {m.mediaUrl && m.mediaType === "video" && (<video src={m.mediaUrl} controls className="rounded-lg max-w-full mb-1.5" />)}
+                        {m.mediaUrl && m.mediaType === "audio" && (<audio src={m.mediaUrl} controls className="w-full mb-1.5" />)}
+                        {m.text && <p className="break-words">{m.text}</p>}
+                        <div className={`flex items-center gap-1 mt-1 justify-end ${isMine ? "text-white/60" : "text-muted-foreground/60"}`}>
+                          <span className="text-[10px]">{formatTime(m.createdAt as unknown as string)}</span>
+                          {isMine && (
+                            <span className={`text-[10px] font-medium ${isSeenByOther ? "text-sky-200" : ""}`}>
+                              {STATUS_ICONS[m.status] || "✓"}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {reactionEntries.length > 0 && (
+                        <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
+                          {reactionEntries.map(([emoji, arr]) => (
+                            <button key={emoji} onClick={() => reactMutation.mutate({ messageId: m.id, emoji })}
+                              className="px-1.5 py-0.5 rounded-full text-[11px] backdrop-blur bg-white/10 border border-white/15 hover:bg-white/20 transition-colors">
+                              {emoji} <span className="text-white/70">{(arr as string[]).length}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setReactingFor(reactingFor === m.id ? null : m.id)}
+                        className={`absolute -top-2 ${isMine ? "-left-2" : "-right-2"} opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-6 h-6 rounded-full liquid-glass-soft flex items-center justify-center`}
+                        aria-label="React"
+                      >
+                        <SmilePlus className="w-3 h-3 text-white/80" />
+                      </button>
+                      {reactingFor === m.id && (
+                        <div className={`absolute z-20 top-full mt-1 ${isMine ? "right-0" : "left-0"} flex gap-0.5 p-1.5 rounded-2xl liquid-glass-strong border border-white/10 shadow-xl`}>
+                          {REACTION_EMOJIS.map((e) => (
+                            <button key={e} onClick={() => reactMutation.mutate({ messageId: m.id, emoji: e })}
+                              className="w-7 h-7 rounded-full hover:bg-white/15 flex items-center justify-center text-base transition-transform hover:scale-125">
+                              {e}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
           ))}
+          {showTyping && (
+            <div className="flex justify-start mb-2">
+              <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm liquid-glass-soft border border-white/10 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" style={{ animationDelay: "120ms" }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" style={{ animationDelay: "240ms" }} />
+              </div>
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
 
         {/* Input area */}
         <div
-          className="shrink-0 px-3 py-3 border-t border-border/40 flex items-end gap-2"
-          style={{ background: "hsl(var(--background))" }}
+          className="shrink-0 px-3 py-3 border-t border-white/10 flex items-end gap-2 relative"
+          style={{ background: "linear-gradient(180deg, hsl(340 18% 6% / 0.5), hsl(340 18% 4% / 0.75))" }}
         >
+          {emojiOpen && (
+            <div className="absolute bottom-full left-2 right-2 mb-2 p-2 rounded-2xl liquid-glass-strong border border-white/10 grid grid-cols-8 gap-1 shadow-xl z-30">
+              {EMOJI_PANEL.map((e) => (
+                <button key={e} onClick={() => setInput((s) => s + e)}
+                  className="w-7 h-7 rounded-full hover:bg-white/15 flex items-center justify-center text-lg transition-transform hover:scale-125">
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Attach menu */}
           <div className="relative shrink-0">
             <button
               onClick={() => setAttachOpen((o) => !o)}
-              className="w-10 h-10 rounded-2xl bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-primary transition-all mb-0.5"
+              className="w-10 h-10 rounded-2xl liquid-glass-soft flex items-center justify-center text-muted-foreground hover:text-primary transition-all mb-0.5"
               title="Attach"
             >
               <Paperclip className="w-4 h-4" />
             </button>
             {attachOpen && (
-              <div className="absolute bottom-12 left-0 z-50 rounded-xl bg-card border border-border/60 shadow-xl p-1 w-44">
+              <div className="absolute bottom-12 left-0 z-50 rounded-xl liquid-glass-strong border border-white/10 shadow-xl p-1 w-44">
                 <button onClick={() => imgInputRef.current?.click()} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/60 text-sm text-foreground">
                   <ImageIcon className="w-4 h-4 text-primary" /> Photo
                 </button>
@@ -405,6 +474,14 @@ export default function ChatBox() {
             }} />
           </div>
 
+          <button
+            onClick={() => setEmojiOpen((o) => !o)}
+            className="w-10 h-10 rounded-2xl liquid-glass-soft flex items-center justify-center text-muted-foreground hover:text-primary transition-all mb-0.5 shrink-0"
+            title="Emoji"
+          >
+            <Smile className="w-4 h-4" />
+          </button>
+
           {recording && (
             <button onClick={stopRecording} className="px-2 text-[11px] text-red-400 font-body animate-pulse">
               ● recording — tap to stop
@@ -418,14 +495,15 @@ export default function ChatBox() {
             onKeyDown={onKey}
             placeholder={isAdmin ? "Reply to her..." : "Type something sweet..."}
             rows={1}
-            className="flex-1 resize-none rounded-2xl bg-muted/60 border border-border/40 px-3.5 py-2.5 text-sm font-body text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all max-h-28 overflow-y-auto"
+            className="flex-1 resize-none rounded-2xl liquid-glass-soft border border-white/10 px-3.5 py-2.5 text-sm font-body text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all max-h-40 overflow-y-auto"
             style={{ lineHeight: "1.5" }}
           />
           <button
             data-testid="button-chat-send"
             onClick={handleSend}
             disabled={!input.trim() || sendMutation.isPending || sendingMedia}
-            className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-accent/80 flex items-center justify-center text-white disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all shrink-0 mb-0.5"
+            className="w-10 h-10 rounded-2xl liquid-sheen flex items-center justify-center text-white disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all shrink-0 mb-0.5"
+            style={{ background: "linear-gradient(135deg, hsl(338 80% 58%), hsl(315 45% 58%))", boxShadow: "0 8px 24px -10px hsl(338 80% 40% / 0.6)" }}
           >
             {sendMutation.isPending || sendingMedia
               ? <Loader2 className="w-4 h-4 animate-spin" />
