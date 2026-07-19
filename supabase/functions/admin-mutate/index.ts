@@ -213,7 +213,16 @@ serve(async (req) => {
         [s.primary_email, s.backup_email].filter(Boolean)
       );
       // Mark page as live now (set premiere_date = now if in the future)
-      await supabase.from("page_settings").update({ premiere_date: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("page_key", pageKey);
+      const nowIso = new Date().toISOString();
+      await supabase.from("page_settings").update({ premiere_date: nowIso, updated_at: nowIso }).eq("page_key", pageKey);
+      // Log the notification run
+      await supabase.from("notification_runs").insert({
+        page_key: pageKey,
+        premiere_date: nowIso,
+        recipients_count: emails.length,
+        recipients: emails,
+        status: emails.length > 0 ? "ok" : "no_subscribers",
+      });
       return json({ ok: true, notified: emails.length, recipients: emails });
     }
 

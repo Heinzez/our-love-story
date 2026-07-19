@@ -79,12 +79,12 @@ serve(async (req) => {
     if (action === "list") {
       const { data, error } = await supabase
         .from("chat_messages")
-        .select("id, text, sender, status, date, is_ai, page_key, created_at, media_url, media_type")
+        .select("id, text, sender, status, date, is_ai, page_key, created_at, media_url, media_type, reactions")
         .order("created_at", { ascending: true });
       if (error) throw error;
       // mark "sent" from her as delivered
       await supabase.from("chat_messages").update({ status: "delivered" }).eq("sender", "her").eq("status", "sent");
-      const mapped = (data ?? []).map((m: Record<string, unknown>) => ({ ...m, isAi: m.is_ai, createdAt: m.created_at, mediaUrl: m.media_url, mediaType: m.media_type }));
+      const mapped = (data ?? []).map((m: Record<string, unknown>) => ({ ...m, isAi: m.is_ai, createdAt: m.created_at, mediaUrl: m.media_url, mediaType: m.media_type, reactions: m.reactions ?? {} }));
       return json(mapped);
     }
 
@@ -172,6 +172,25 @@ serve(async (req) => {
       const markSender = (body as Record<string, unknown>).markSender === "me" ? "me" : "her";
       await supabase.from("chat_messages").update({ status: "seen" }).eq("sender", markSender);
       return json({ ok: true });
+    }
+
+    if (action === "react") {
+      const messageId = String((body as Record<string, unknown>).messageId || "");
+      const emoji = String((body as Record<string, unknown>).emoji || "").slice(0, 8);
+      const who = (body as Record<string, unknown>).who === "me" ? "me" : "her";
+      if (!messageId || !emoji) return json({ error: "missing" }, 400);
+      const allowed = new Set(["❤️","😂","🥺","🔥","🌹","😍","👀","🙌"]);
+      if (!allowed.has(emoji)) return json({ error: "emoji not allowed" }, 400);
+      const { data: existing } = await supabase.from("chat_messages").select("reactions").eq("id", messageId).maybeSingle();
+      const current = (existing?.reactions ?? {}) as Record<string, string[]>;
+      const arr = new Set(current[emoji] ?? []);
+      if (arr.has(who)) arr.delete(who); else arr.add(who);
+      const next = { ...current, [emoji]: Array.from(arr) };
+      // clean empties
+      for (const k of Object.keys(next)) if (!next[k].length) delete next[k];
+      const { error } = await supabase.from("chat_messages").update({ reactions: next }).eq("id", messageId);
+      if (error) throw error;
+      return json({ ok: true, reactions: next });
     }
 
     return json({ error: "Unknown action" }, 400);
