@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck, Paperclip, Mic, Image as ImageIcon, Film, Square } from "lucide-react";
+import { MessageCircleHeart, Send, ChevronDown, Heart, Loader2, ShieldCheck, Paperclip, Mic, Image as ImageIcon, Film, Square, Smile, SmilePlus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSite } from "@/context/SiteContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ type ChatMessage = {
   createdAt: string;
   mediaUrl?: string | null;
   mediaType?: string | null;
+  reactions?: Record<string, string[]>;
 };
 
 // ── Status display ────────────────────────────────────────────
@@ -22,6 +23,9 @@ const STATUS_ICONS: Record<string, string> = {
   delivered: "✓✓",
   seen: "✓✓",
 };
+
+const REACTION_EMOJIS = ["❤️", "😂", "🥺", "🔥", "🌹", "😍", "👀", "🙌"];
+const EMOJI_PANEL = ["❤️","😂","🥺","🔥","🌹","😍","👀","🙌","💍","✨","💕","💌","🤍","😘","🥰","😌","🙈","💫","🌙","☕","🍷","🌸","💖","🫶"];
 
 function groupByDay(messages: ChatMessage[]) {
   const groups: Record<string, ChatMessage[]> = {};
