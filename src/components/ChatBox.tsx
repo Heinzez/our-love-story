@@ -427,20 +427,30 @@ export default function ChatBox() {
 
         {/* Input area */}
         <div
-          className="shrink-0 px-3 py-3 border-t border-border/40 flex items-end gap-2"
-          style={{ background: "hsl(var(--background))" }}
+          className="shrink-0 px-3 py-3 border-t border-white/10 flex items-end gap-2 relative"
+          style={{ background: "linear-gradient(180deg, hsl(340 18% 6% / 0.5), hsl(340 18% 4% / 0.75))" }}
         >
+          {emojiOpen && (
+            <div className="absolute bottom-full left-2 right-2 mb-2 p-2 rounded-2xl liquid-glass-strong border border-white/10 grid grid-cols-8 gap-1 shadow-xl z-30">
+              {EMOJI_PANEL.map((e) => (
+                <button key={e} onClick={() => setInput((s) => s + e)}
+                  className="w-7 h-7 rounded-full hover:bg-white/15 flex items-center justify-center text-lg transition-transform hover:scale-125">
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Attach menu */}
           <div className="relative shrink-0">
             <button
               onClick={() => setAttachOpen((o) => !o)}
-              className="w-10 h-10 rounded-2xl bg-muted/60 flex items-center justify-center text-muted-foreground hover:text-primary transition-all mb-0.5"
+              className="w-10 h-10 rounded-2xl liquid-glass-soft flex items-center justify-center text-muted-foreground hover:text-primary transition-all mb-0.5"
               title="Attach"
             >
               <Paperclip className="w-4 h-4" />
             </button>
             {attachOpen && (
-              <div className="absolute bottom-12 left-0 z-50 rounded-xl bg-card border border-border/60 shadow-xl p-1 w-44">
+              <div className="absolute bottom-12 left-0 z-50 rounded-xl liquid-glass-strong border border-white/10 shadow-xl p-1 w-44">
                 <button onClick={() => imgInputRef.current?.click()} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted/60 text-sm text-foreground">
                   <ImageIcon className="w-4 h-4 text-primary" /> Photo
                 </button>
@@ -464,6 +474,14 @@ export default function ChatBox() {
             }} />
           </div>
 
+          <button
+            onClick={() => setEmojiOpen((o) => !o)}
+            className="w-10 h-10 rounded-2xl liquid-glass-soft flex items-center justify-center text-muted-foreground hover:text-primary transition-all mb-0.5 shrink-0"
+            title="Emoji"
+          >
+            <Smile className="w-4 h-4" />
+          </button>
+
           {recording && (
             <button onClick={stopRecording} className="px-2 text-[11px] text-red-400 font-body animate-pulse">
               ● recording — tap to stop
@@ -477,14 +495,15 @@ export default function ChatBox() {
             onKeyDown={onKey}
             placeholder={isAdmin ? "Reply to her..." : "Type something sweet..."}
             rows={1}
-            className="flex-1 resize-none rounded-2xl bg-muted/60 border border-border/40 px-3.5 py-2.5 text-sm font-body text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all max-h-28 overflow-y-auto"
+            className="flex-1 resize-none rounded-2xl liquid-glass-soft border border-white/10 px-3.5 py-2.5 text-sm font-body text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all max-h-40 overflow-y-auto"
             style={{ lineHeight: "1.5" }}
           />
           <button
             data-testid="button-chat-send"
             onClick={handleSend}
             disabled={!input.trim() || sendMutation.isPending || sendingMedia}
-            className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-accent/80 flex items-center justify-center text-white disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all shrink-0 mb-0.5"
+            className="w-10 h-10 rounded-2xl liquid-sheen flex items-center justify-center text-white disabled:opacity-40 hover:opacity-90 active:scale-95 transition-all shrink-0 mb-0.5"
+            style={{ background: "linear-gradient(135deg, hsl(338 80% 58%), hsl(315 45% 58%))", boxShadow: "0 8px 24px -10px hsl(338 80% 40% / 0.6)" }}
           >
             {sendMutation.isPending || sendingMedia
               ? <Loader2 className="w-4 h-4 animate-spin" />
