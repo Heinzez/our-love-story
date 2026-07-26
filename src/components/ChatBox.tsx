@@ -287,7 +287,7 @@ export default function ChatBox() {
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-8 pointer-events-none"
           }
-          w-full sm:w-[380px] sm:bottom-24 sm:right-6 sm:rounded-3xl overflow-hidden
+          w-full sm:w-[380px] sm:bottom-24 sm:left-6 sm:rounded-3xl overflow-hidden
           shadow-2xl shadow-primary/20
         `}
         style={{ height: open ? "min(560px, 85vh)" : "0px" }}
