@@ -287,7 +287,7 @@ const GiftPage = () => {
                       {m.is_active ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                     </button>
                     <button
-                      onClick={() => remove(m.id)}
+                      onClick={() => setConfirmDelete(m)}
                       className="py-1.5 px-3 rounded-lg text-[11px] font-display tracking-wider text-destructive/70 hover:text-destructive"
                     >
                       <Trash2 className="w-3 h-3" />
