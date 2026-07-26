@@ -265,7 +265,12 @@ export default function ChatBox() {
       <button
         data-testid="button-chat-open"
         onClick={() => setOpen(true)}
-        className={`fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-[95] w-14 h-14 rounded-full liquid-glass-strong liquid-sheen shadow-lg shadow-primary/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+        aria-label="Open chat"
+        style={{
+          background: "linear-gradient(135deg, hsl(338 80% 62%), hsl(355 70% 68%))",
+          boxShadow: "0 8px 32px hsl(338 80% 62% / 0.5), 0 0 0 1px hsl(338 80% 75% / 0.3) inset",
+        }}
+        className={`fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-[95] w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       >
         <MessageCircleHeart className="w-6 h-6 text-white" />
         {unread > 0 && (
