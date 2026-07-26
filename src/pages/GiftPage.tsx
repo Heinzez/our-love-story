@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Gift, Check, Copy, Loader2, Plus, Edit3, Trash2, Save, X, Landmark, Smartphone,
   Wallet, CreditCard, Coins, ExternalLink, Heart, Eye, EyeOff, Sparkles, PiggyBank,
-  ArrowDownToLine,
+  ShieldCheck, Phone,
 } from "lucide-react";
-import { useSite } from "@/context/SiteContext";
 import { supabase } from "@/integrations/supabase/client";
 
 type PayoutMethod = {
@@ -20,12 +19,12 @@ type PayoutMethod = {
 };
 
 const KINDS: { value: PayoutMethod["kind"]; label: string; Icon: typeof Landmark; hint: string; placeholder: string }[] = [
-  { value: "paypal", label: "PayPal",  Icon: Wallet,     hint: "The email tied to your PayPal", placeholder: "you@paypal.com" },
-  { value: "bank",   label: "Bank",    Icon: Landmark,   hint: "Account / IBAN for direct deposit", placeholder: "IBAN or account number" },
-  { value: "card",   label: "Card",    Icon: CreditCard, hint: "For direct card deposits",  placeholder: "Card number or link" },
-  { value: "crypto", label: "Crypto",  Icon: Coins,      hint: "Wallet address (BTC, ETH, USDT…)", placeholder: "0x… or bc1…" },
-  { value: "mobile", label: "Mobile",  Icon: Smartphone, hint: "Mobile money number", placeholder: "+254 …" },
-  { value: "other",  label: "Other",   Icon: Gift,       hint: "Anything else", placeholder: "Details" },
+  { value: "mobile", label: "Mobile Money", Icon: Smartphone, hint: "Your M-Pesa / mobile money number", placeholder: "+254 7•• ••• •••" },
+  { value: "bank",   label: "Bank",         Icon: Landmark,   hint: "Account or IBAN for direct deposit",   placeholder: "IBAN / account number" },
+  { value: "paypal", label: "PayPal",       Icon: Wallet,     hint: "Email tied to your PayPal",           placeholder: "you@paypal.com" },
+  { value: "card",   label: "Card",         Icon: CreditCard, hint: "Direct card deposit or link",         placeholder: "Card number or link" },
+  { value: "crypto", label: "Crypto",       Icon: Coins,      hint: "Wallet address (BTC, ETH, USDT…)",    placeholder: "0x… or bc1…" },
+  { value: "other",  label: "Other",        Icon: Gift,       hint: "Anything else",                        placeholder: "Details" },
 ];
 
 const iconFor = (k: string) => KINDS.find((x) => x.value === k)?.Icon ?? Gift;
@@ -41,10 +40,9 @@ function buildAction(m: PayoutMethod): { href: string; label: string } | null {
   }
   if (m.kind === "mobile") {
     const tel = v.replace(/[^\d+]/g, "");
-    return { href: `tel:${tel}`, label: "Call / dial" };
+    return { href: `tel:${tel}`, label: "Dial number" };
   }
   if (m.kind === "crypto") {
-    // Best-effort: try wallet URI (some wallets handle bitcoin:/ethereum:)
     if (/^0x[a-fA-F0-9]{40}$/.test(v)) return { href: `ethereum:${v}`, label: "Open in wallet" };
     if (/^(bc1|[13])/.test(v)) return { href: `bitcoin:${v}`, label: "Open in wallet" };
   }
@@ -52,24 +50,24 @@ function buildAction(m: PayoutMethod): { href: string; label: string } | null {
 }
 
 const GiftPage = () => {
-  const { isAdmin } = useSite();
   const [methods, setMethods] = useState<PayoutMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<PayoutMethod | null>(null);
   const [saving, setSaving] = useState(false);
-  const [autoWithdraw, setAutoWithdraw] = useState<string>(() => localStorage.getItem("auto_withdraw_pref") || "off");
+  const [confirmDelete, setConfirmDelete] = useState<PayoutMethod | null>(null);
 
   const load = async () => {
     setLoading(true);
-    let q = supabase.from("payment_methods").select("*").order("sort_order", { ascending: true });
-    if (!isAdmin) q = q.eq("is_active", true);
-    const { data } = await q;
+    const { data } = await supabase
+      .from("payment_methods")
+      .select("*")
+      .order("sort_order", { ascending: true });
     setMethods((data ?? []) as PayoutMethod[]);
     setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [isAdmin]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   const copy = async (m: PayoutMethod) => {
     try {
@@ -107,10 +105,10 @@ const GiftPage = () => {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Remove this payout method?")) return;
     await supabase.functions.invoke("admin-mutate", {
       body: { action: "her-payout-delete", id },
     });
+    setConfirmDelete(null);
     await load();
   };
 
@@ -121,12 +119,8 @@ const GiftPage = () => {
     await load();
   };
 
-  const updateWithdraw = (v: string) => {
-    setAutoWithdraw(v);
-    localStorage.setItem("auto_withdraw_pref", v);
-  };
-
   const activeCount = useMemo(() => methods.filter((m) => m.is_active).length, [methods]);
+  const totalCount = methods.length;
 
   return (
     <div className="min-h-screen pt-24 pb-24 px-4 relative">
@@ -152,52 +146,46 @@ const GiftPage = () => {
             Your Receiving Setup
           </h1>
           <p className="text-muted-foreground font-body text-sm max-w-md mx-auto leading-relaxed">
-            Set up where you'd like to receive — PayPal, bank, card, or crypto. Add as many as you want.
-            I'll use these when I send anything your way. 💕
+            Save the places you'd like to receive money — mobile money, bank, PayPal, card, or crypto.
+            Everything stays encrypted in your private backend. Only you manage it. 💕
           </p>
+          <div className="mt-4 inline-flex items-center gap-1.5 chip-glass text-[10px]">
+            <ShieldCheck className="w-3 h-3 text-primary" /> stored securely — only you can edit
+          </div>
         </div>
 
-        {/* Auto-withdraw preference — persisted locally as a preference chip */}
+        {/* Summary strip */}
         <div className="liquid-glass p-4 mb-6 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl liquid-glass-soft flex items-center justify-center text-primary">
-              <ArrowDownToLine className="w-4 h-4" />
+              <Wallet className="w-4 h-4" />
             </div>
             <div>
-              <div className="font-display text-sm">Recurring auto-withdrawals</div>
-              <div className="text-[11px] text-muted-foreground/70 font-body">Choose how often to sweep incoming funds</div>
+              <div className="font-display text-sm">
+                {activeCount} active · {totalCount} saved
+              </div>
+              <div className="text-[11px] text-muted-foreground/70 font-body">
+                Add or update anytime — changes save instantly
+              </div>
             </div>
           </div>
-          <div className="flex gap-1">
-            {[
-              { v: "off", l: "Off" },
-              { v: "weekly", l: "Weekly" },
-              { v: "monthly", l: "Monthly" },
-            ].map((o) => (
-              <button
-                key={o.v}
-                onClick={() => updateWithdraw(o.v)}
-                className={`px-3 py-1.5 rounded-full text-[11px] font-display tracking-wider transition-all ${
-                  autoWithdraw === o.v
-                    ? "bg-primary/20 text-primary ring-1 ring-primary/50"
-                    : "liquid-glass-soft text-muted-foreground"
-                }`}
-              >
-                {o.l}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => setEditing(blank("mobile"))}
+            className="btn-liquid rounded-full px-4 py-2 text-xs font-display tracking-wider inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add method
+          </button>
         </div>
 
-        {/* Quick-add shortcuts */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
-          {KINDS.slice(0, 4).map(({ value, label, Icon }) => (
+        {/* Quick-add shortcuts — all 6 kinds */}
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-6">
+          {KINDS.map(({ value, label, Icon }) => (
             <button
               key={value}
               onClick={() => setEditing(blank(value))}
-              className="liquid-glass-soft rounded-xl py-3 px-2 text-[11px] font-display tracking-wider inline-flex flex-col items-center gap-1.5 hover:ring-1 hover:ring-primary/40 text-muted-foreground hover:text-primary transition-all"
+              className="liquid-glass-soft rounded-xl py-3 px-2 text-[10px] font-display tracking-wider inline-flex flex-col items-center gap-1.5 hover:ring-1 hover:ring-primary/40 text-muted-foreground hover:text-primary transition-all"
             >
-              <Icon className="w-4 h-4" /> Add {label}
+              <Icon className="w-4 h-4" /> {label}
             </button>
           ))}
         </div>
@@ -210,8 +198,14 @@ const GiftPage = () => {
           <div className="liquid-glass p-12 text-center">
             <Sparkles className="w-10 h-10 text-primary/40 mx-auto mb-3" />
             <p className="font-body text-muted-foreground/70 text-sm mb-4">
-              Nothing set up yet. Add your first receiving method above.
+              Nothing saved yet. Tap a method above to add your first one.
             </p>
+            <button
+              onClick={() => setEditing(blank("mobile"))}
+              className="btn-liquid rounded-full px-5 py-2.5 text-xs font-display tracking-wider inline-flex items-center gap-1.5"
+            >
+              <Phone className="w-3.5 h-3.5" /> Start with Mobile Money
+            </button>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
