@@ -261,11 +261,11 @@ export default function ChatBox() {
 
   return (
     <>
-      {/* Floating bubble — bottom-LEFT to avoid audio controls on the right */}
+      {/* Floating bubble — bottom-RIGHT, stacked above the audio player */}
       <button
         data-testid="button-chat-open"
         onClick={() => setOpen(true)}
-        className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full liquid-glass-strong liquid-sheen shadow-lg shadow-primary/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+        className={`fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-[95] w-14 h-14 rounded-full liquid-glass-strong liquid-sheen shadow-lg shadow-primary/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${open ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       >
         <MessageCircleHeart className="w-6 h-6 text-white" />
         {unread > 0 && (
@@ -275,14 +275,14 @@ export default function ChatBox() {
         )}
       </button>
 
-      {/* Chat window — anchored bottom-left */}
+      {/* Chat window — anchored bottom-right */}
       <div
-        className={`fixed bottom-0 left-0 z-50 flex flex-col transition-all duration-400 ease-out liquid-glass-strong
+        className={`fixed bottom-0 right-0 z-50 flex flex-col transition-all duration-400 ease-out liquid-glass-strong
           ${open
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 translate-y-8 pointer-events-none"
           }
-          w-full sm:w-[380px] sm:bottom-6 sm:left-6 sm:rounded-3xl overflow-hidden
+          w-full sm:w-[380px] sm:bottom-24 sm:right-6 sm:rounded-3xl overflow-hidden
           shadow-2xl shadow-primary/20
         `}
         style={{ height: open ? "min(560px, 85vh)" : "0px" }}
