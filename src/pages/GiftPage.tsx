@@ -398,6 +398,37 @@ const GiftPage = () => {
           </div>
         </div>
       )}
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center p-4"
+          style={{ background: "hsl(340 18% 3% / 0.9)", backdropFilter: "blur(24px)" }}
+        >
+          <div className="liquid-glass-strong grain max-w-sm w-full p-6 text-center">
+            <div className="w-12 h-12 rounded-2xl liquid-glass-soft flex items-center justify-center mx-auto mb-3 text-destructive">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <h3 className="font-display text-lg gradient-text mb-1">Remove this method?</h3>
+            <p className="text-xs font-body text-muted-foreground/70 mb-5">
+              "{confirmDelete.label}" will be deleted from your saved list. You can always add it back later.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2.5 rounded-xl liquid-glass-soft text-sm font-display tracking-wide"
+              >
+                Keep
+              </button>
+              <button
+                onClick={() => remove(confirmDelete.id)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-display tracking-wide bg-destructive/20 text-destructive ring-1 ring-destructive/40 hover:bg-destructive/30"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
