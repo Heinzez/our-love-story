@@ -148,7 +148,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
             <div className="absolute top-0 bottom-0 left-0 w-1/2 overflow-hidden rounded-l-[6px]"
               style={{ background: "#efe1c8" }}>
               {leftPage ? (
-                <PageFace page={leftPage} side="left" pageNum={spread * 2} />
+                <PageFace page={leftPage} side="left" pageNum={spread * 2} eager={spread <= 1} />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#3a1c08] to-[#1a0a03] text-[#e7c88a]">
                   <BookOpen className="w-10 h-10 opacity-80" />
@@ -169,7 +169,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
                 <PageFace page={leaves[spread - 1].back} side="right" pageNum={(spread - 1) * 2 + 2} />
               ) : rightPage ? (
                 <div onClick={openLightbox} className="w-full h-full cursor-zoom-in">
-                  <PageFace page={rightPage} side="right" pageNum={spread * 2 + 1} />
+                  <PageFace page={rightPage} side="right" pageNum={spread * 2 + 1} eager={spread <= 1} />
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#3a1c08] to-[#1a0a03] text-[#e7c88a]">
@@ -221,17 +221,17 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
           onClick={() => go("prev")}
           disabled={!canPrev || !!flipping}
           aria-label="Previous page"
-          className="absolute -left-3 md:-left-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full liquid-glass border border-primary/40 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-30"
+          className="absolute left-2 md:-left-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-6 h-6" />
         </button>
         <button
           onClick={() => go("next")}
           disabled={!canNext || !!flipping}
           aria-label="Next page"
-          className="absolute -right-3 md:-right-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full liquid-glass border border-primary/40 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-30"
+          className="absolute right-2 md:-right-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-6 h-6" />
         </button>
       </div>
 
