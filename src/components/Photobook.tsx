@@ -15,7 +15,8 @@ function useLeaves(photos: Page[]) {
   return leaves;
 }
 
-const PageFace = ({ page, side, pageNum }: { page: Page; side: "left" | "right"; pageNum: number }) => {
+const PageFace = ({ page, side, pageNum, eager }: { page: Page; side: "left" | "right"; pageNum: number; eager?: boolean }) => {
+  const [loaded, setLoaded] = useState(false);
   if (!page || !page.src) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#f8f1e6] to-[#efe3d0] text-[#8a6a4a]/40 font-script text-2xl">
@@ -26,7 +27,20 @@ const PageFace = ({ page, side, pageNum }: { page: Page; side: "left" | "right";
   return (
     <div className="absolute inset-0 bg-gradient-to-br from-[#fbf5ea] to-[#efe1c8] p-4 md:p-6 flex flex-col">
       <div className="flex-1 relative overflow-hidden rounded-md shadow-inner">
-        <img src={page.src} alt={page.caption} className="w-full h-full object-cover" draggable={false} loading="lazy" />
+        {!loaded && (
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#e8d7b8] via-[#f0e2c8] to-[#e8d7b8]" />
+        )}
+        <img
+          src={page.src}
+          alt={page.caption}
+          className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
+          draggable={false}
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
+          fetchPriority={eager ? "high" : "auto" as any}
+          onLoad={() => setLoaded(true)}
+          onError={() => setLoaded(true)}
+        />
         <div className="absolute inset-0 pointer-events-none" style={{
           boxShadow: side === "right"
             ? "inset 22px 0 30px -18px rgba(60,30,10,0.35)"
@@ -54,6 +68,21 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
   const canPrev = spread > 0;
   const canNext = spread < total;
 
+  // Preload neighbor pages for snappy flips
+  useEffect(() => {
+    const toPreload: string[] = [];
+    for (let d = -2; d <= 2; d++) {
+      const s = spread + d;
+      if (s < 0 || s > total) continue;
+      if (s > 0 && leaves[s - 1]?.back?.src) toPreload.push(leaves[s - 1].back.src);
+      if (s < total && leaves[s]?.front?.src) toPreload.push(leaves[s].front.src);
+    }
+    toPreload.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [spread, total, leaves]);
+
   const go = (dir: "next" | "prev") => {
     if (flipping) return;
     if (dir === "next" && !canNext) return;
@@ -65,6 +94,8 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
       setFlipping(null);
     }, 780);
   };
+
+  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -117,7 +148,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
             <div className="absolute top-0 bottom-0 left-0 w-1/2 overflow-hidden rounded-l-[6px]"
               style={{ background: "#efe1c8" }}>
               {leftPage ? (
-                <PageFace page={leftPage} side="left" pageNum={spread * 2} />
+                <PageFace page={leftPage} side="left" pageNum={spread * 2} eager={spread <= 1} />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#3a1c08] to-[#1a0a03] text-[#e7c88a]">
                   <BookOpen className="w-10 h-10 opacity-80" />
@@ -138,7 +169,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
                 <PageFace page={leaves[spread - 1].back} side="right" pageNum={(spread - 1) * 2 + 2} />
               ) : rightPage ? (
                 <div onClick={openLightbox} className="w-full h-full cursor-zoom-in">
-                  <PageFace page={rightPage} side="right" pageNum={spread * 2 + 1} />
+                  <PageFace page={rightPage} side="right" pageNum={spread * 2 + 1} eager={spread <= 1} />
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#3a1c08] to-[#1a0a03] text-[#e7c88a]">
@@ -190,17 +221,17 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
           onClick={() => go("prev")}
           disabled={!canPrev || !!flipping}
           aria-label="Previous page"
-          className="absolute -left-3 md:-left-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full liquid-glass border border-primary/40 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-30"
+          className="absolute left-2 md:-left-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-6 h-6" />
         </button>
         <button
           onClick={() => go("next")}
           disabled={!canNext || !!flipping}
           aria-label="Next page"
-          className="absolute -right-3 md:-right-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full liquid-glass border border-primary/40 text-primary hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-30"
+          className="absolute right-2 md:-right-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-6 h-6" />
         </button>
       </div>
 
