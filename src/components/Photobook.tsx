@@ -15,7 +15,8 @@ function useLeaves(photos: Page[]) {
   return leaves;
 }
 
-const PageFace = ({ page, side, pageNum }: { page: Page; side: "left" | "right"; pageNum: number }) => {
+const PageFace = ({ page, side, pageNum, eager }: { page: Page; side: "left" | "right"; pageNum: number; eager?: boolean }) => {
+  const [loaded, setLoaded] = useState(false);
   if (!page || !page.src) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#f8f1e6] to-[#efe3d0] text-[#8a6a4a]/40 font-script text-2xl">
@@ -26,7 +27,20 @@ const PageFace = ({ page, side, pageNum }: { page: Page; side: "left" | "right";
   return (
     <div className="absolute inset-0 bg-gradient-to-br from-[#fbf5ea] to-[#efe1c8] p-4 md:p-6 flex flex-col">
       <div className="flex-1 relative overflow-hidden rounded-md shadow-inner">
-        <img src={page.src} alt={page.caption} className="w-full h-full object-cover" draggable={false} loading="lazy" />
+        {!loaded && (
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#e8d7b8] via-[#f0e2c8] to-[#e8d7b8]" />
+        )}
+        <img
+          src={page.src}
+          alt={page.caption}
+          className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
+          draggable={false}
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
+          fetchPriority={eager ? "high" : "auto" as any}
+          onLoad={() => setLoaded(true)}
+          onError={() => setLoaded(true)}
+        />
         <div className="absolute inset-0 pointer-events-none" style={{
           boxShadow: side === "right"
             ? "inset 22px 0 30px -18px rgba(60,30,10,0.35)"
@@ -54,6 +68,21 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
   const canPrev = spread > 0;
   const canNext = spread < total;
 
+  // Preload neighbor pages for snappy flips
+  useEffect(() => {
+    const toPreload: string[] = [];
+    for (let d = -2; d <= 2; d++) {
+      const s = spread + d;
+      if (s < 0 || s > total) continue;
+      if (s > 0 && leaves[s - 1]?.back?.src) toPreload.push(leaves[s - 1].back.src);
+      if (s < total && leaves[s]?.front?.src) toPreload.push(leaves[s].front.src);
+    }
+    toPreload.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [spread, total, leaves]);
+
   const go = (dir: "next" | "prev") => {
     if (flipping) return;
     if (dir === "next" && !canNext) return;
@@ -65,6 +94,8 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
       setFlipping(null);
     }, 780);
   };
+
+  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
