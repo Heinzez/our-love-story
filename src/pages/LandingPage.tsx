@@ -36,6 +36,7 @@ import photo35 from "@/assets/photo35.jpg";
 import photo36 from "@/assets/photo36.jpg";
 import photo37 from "@/assets/photo37.jpg";
 import FloatingElements from "@/components/FloatingElements";
+import Photobook from "@/components/Photobook";
 import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight, Plus, ImagePlus, Loader2, Trash2, Video, Film } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -461,8 +462,11 @@ const LandingPage = () => {
       {/* ── 3D Gallery ── */}
       <section className="relative z-10 max-w-3xl mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-display gradient-text mb-2">Our Memories</h2>
-          <p className="text-muted-foreground text-sm font-body">hover each stack · click to open</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/8 text-primary text-[10px] font-body tracking-widest uppercase mb-3">
+            ✦ our photobook ✦
+          </div>
+          <h2 className="text-3xl md:text-4xl font-display gradient-text mb-2">Turn the Pages of Us</h2>
+          <p className="text-muted-foreground text-sm font-body">click the arrows · use ← → keys · tap a page to zoom</p>
           {herPhotoCount > 0 && (
             <p className="text-primary/50 text-xs font-body mt-1">
               {herPhotoCount} photo{herPhotoCount !== 1 ? "s" : ""} added by you ✨
@@ -470,17 +474,7 @@ const LandingPage = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-20">
-          {GROUPS.map((groupPhotos, groupIdx) => (
-            <PhotoGroup
-              key={groupIdx}
-              groupPhotos={groupPhotos}
-              groupIndex={groupIdx}
-              startIndex={startIndices[groupIdx]}
-              onOpen={openLightbox}
-            />
-          ))}
-        </div>
+        <Photobook photos={allPhotos} captions={captions} />
 
         {/* Add Photos row */}
         <div className="mt-20 pt-6 border-t border-border/20">
