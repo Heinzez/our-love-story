@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Heart, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 type Page = { src: string; caption: string };
 
@@ -7,19 +7,53 @@ type Page = { src: string; caption: string };
 const photoCache = new Set<string>();
 const FLIP_MS = 900;
 
-const LeatherCover = ({ side }: { side: "left" | "right" }) => (
-  <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-[#fbf5ea] to-[#efe1c8]">
-    {side === "right" && (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center">
-        <Heart className="w-20 h-20 md:w-24 md:h-24 text-primary" style={{ fill: "rgba(232,197,130,0.15)" }} />
-        <div className="font-script italic text-3xl md:text-4xl text-[#5a3a1e]">Ours, always.</div>
-        <div className="font-display text-xs tracking-[0.4em] uppercase text-[#8a6a4a]">— a photobook —</div>
-        <div className="mt-2 font-script italic text-sm text-[#8a6a4a]/70">turn the page →</div>
-      </div>
-    )}
-    {side === "left" && (
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="font-script italic text-lg text-[#8a6a4a]/60">bound in love · 2026</div>
+// Leather panel used for the closed cover and the inner cover pages.
+// `variant="closed"` shows the full title on the front of the shut book.
+// `variant="inner"` is the softer leather lining you see once the book opens.
+const LeatherCover = ({ variant = "inner" }: { variant?: "closed" | "inner" }) => (
+  <div
+    className="absolute inset-0 overflow-hidden"
+    style={{
+      background:
+        "radial-gradient(120% 120% at 30% 20%, #4a2410 0%, #2e1608 55%, #1a0a03 100%)",
+    }}
+  >
+    {/* leather grain */}
+    <div
+      className="absolute inset-0 opacity-[0.35] mix-blend-overlay pointer-events-none"
+      style={{
+        backgroundImage:
+          "radial-gradient(rgba(255,220,170,0.12) 1px, transparent 1px), radial-gradient(rgba(0,0,0,0.35) 1px, transparent 1px)",
+        backgroundSize: "3px 3px, 5px 5px",
+        backgroundPosition: "0 0, 1px 2px",
+      }}
+    />
+    {/* soft sheen */}
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(255,220,170,0.10), transparent 40%, transparent 70%, rgba(0,0,0,0.35))",
+      }}
+    />
+    {/* gilded inner border */}
+    <div className="absolute inset-3 rounded-[4px] border border-[#c9964a]/60 pointer-events-none" />
+    <div className="absolute inset-4 rounded-[3px] border border-[#c9964a]/25 pointer-events-none" />
+
+    {variant === "closed" && (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
+        <div className="font-display text-[10px] md:text-xs tracking-[0.5em] uppercase text-[#e7c88a]/70">
+          — for you —
+        </div>
+        <div className="mt-2 font-script italic text-3xl md:text-5xl leading-tight text-[#f1d9a6] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
+          Memories meant to last,
+        </div>
+        <div className="font-script italic text-2xl md:text-4xl text-[#e7c88a] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
+          Beauty &amp; Magnificence.
+        </div>
+        <div className="mt-6 font-display text-[10px] tracking-[0.4em] uppercase text-[#c9964a]/70">
+          open →
+        </div>
       </div>
     )}
   </div>
@@ -89,6 +123,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
   const total = leaves.length;
   const canPrev = spread > 0;
   const canNext = spread < total;
+  const isClosed = spread === 0;
 
   // Preload neighbor pages for snappy flips
   useEffect(() => {
@@ -208,17 +243,26 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {/* Book base with spine + shadow */}
+        {/* Book base with spine + shadow. Narrows to a single panel when closed. */}
         <div
-          className="relative mx-auto rounded-[10px]"
+          className="relative mx-auto rounded-[10px] transition-[max-width] duration-500"
           style={{
-            aspectRatio: "16 / 10",
+            aspectRatio: isClosed ? "8 / 10" : "16 / 10",
+            maxWidth: isClosed ? 460 : 920,
             background: "linear-gradient(180deg,#2a1508,#160902)",
-            boxShadow: "0 40px 80px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,150,80,0.15) inset",
+            boxShadow:
+              "0 40px 80px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,150,80,0.15) inset",
             padding: "14px",
           }}
         >
           <div className="relative w-full h-full" style={{ transformStyle: "preserve-3d" }}>
+            {isClosed ? (
+              /* Single closed cover panel */
+              <div className="absolute inset-0 overflow-hidden rounded-[6px]">
+                <LeatherCover variant="closed" />
+              </div>
+            ) : (
+              <>
             {/* Spine */}
             <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[3px] z-30 pointer-events-none"
               style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.6), rgba(200,150,80,0.2), rgba(0,0,0,0.6))" }} />
@@ -229,7 +273,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
               {leftPage ? (
                 <PageFace page={leftPage} side="left" pageNum={spread * 2} eager={spread <= 1} />
               ) : (
-                <LeatherCover side="left" />
+                <LeatherCover variant="inner" />
               )}
             </div>
 
@@ -242,12 +286,10 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
               ) : flipping === "prev" && spread - 1 >= 0 && leaves[spread - 1] ? (
                 // Prev-flipping: the leaf being turned back exposes its own back underneath (same content briefly).
                 <PageFace page={leaves[spread - 1].back} side="right" pageNum={(spread - 1) * 2 + 2} />
-              ) : rightPage && spread > 0 ? (
+              ) : rightPage ? (
                 <div onClick={openLightbox} className="w-full h-full cursor-zoom-in">
                   <PageFace page={rightPage} side="right" pageNum={spread * 2 + 1} eager={spread <= 1} />
                 </div>
-              ) : rightPage && spread === 0 ? (
-                <LeatherCover side="right" />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#3a1c08] to-[#1a0a03] text-[#e7c88a]">
                   <div className="font-display text-2xl">The End</div>
@@ -273,11 +315,10 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
                 {/* Front face (the currently visible side before flipping) */}
                 <div className="absolute inset-0 overflow-hidden" style={{ backfaceVisibility: "hidden", transform: "translateZ(0.01px)" }}>
                   <PageFace
-                    page={flipping === "next" ? (spread === 0 ? { src: "", caption: "cover" } : flipLeaf.front) : flipLeaf.back}
+                    page={flipping === "next" ? flipLeaf.front : flipLeaf.back}
                     side={flipping === "next" ? "right" : "left"}
                     pageNum={flipping === "next" ? spread * 2 + 1 : spread * 2}
                   />
-                  {spread === 0 && flipping === "next" && <LeatherCover side="right" />}
                 </div>
                 {/* Back face (the one revealed as leaf turns) */}
                 <div
@@ -300,22 +341,24 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
                 }} />
               </div>
             )}
+              </>
+            )}
           </div>
         </div>
 
         {/* Controls */}
         <button
           onClick={() => go("prev")}
-          disabled={!canPrev || !!flipping}
+          disabled={!canPrev || !!flipping || isClosed}
           aria-label="Previous page"
-          className="absolute left-2 md:-left-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
+          className={`absolute left-2 md:-left-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40`}
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
         <button
           onClick={() => go("next")}
           disabled={!canNext || !!flipping}
-          aria-label="Next page"
+          aria-label={isClosed ? "Open book" : "Next page"}
           className="absolute right-2 md:-right-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
         >
           <ChevronRight className="w-6 h-6" />
@@ -324,7 +367,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
 
       {/* Page counter */}
       <div className="text-center mt-6 text-xs font-body tracking-[0.2em] uppercase text-primary/60">
-        {spread === 0 ? "cover" : spread === total ? "end" : `page ${spread * 2} · ${spread * 2 + 1}`} <span className="opacity-40">/ {total * 2}</span>
+        {isClosed ? "cover · for you" : spread === total ? "end" : `page ${spread * 2} · ${spread * 2 + 1}`} <span className="opacity-40">/ {total * 2}</span>
       </div>
 
       {/* Lightbox */}
