@@ -1,7 +1,104 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, BookOpen, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, X } from "lucide-react";
 
 type Page = { src: string; caption: string };
+
+// Module-level cache: dedupes Image() prefetches within a session
+const photoCache = new Set<string>();
+const FLIP_MS = 720;
+
+const LeatherCover = ({ side }: { side: "left" | "right" }) => (
+  <div className="absolute inset-0 overflow-hidden">
+    {/* base leather */}
+    <div className="absolute inset-0" style={{
+      background:
+        "radial-gradient(120% 90% at 30% 20%, #6b2a17 0%, #4a180b 40%, #2a0c04 75%, #180602 100%)",
+    }} />
+    {/* leather grain */}
+    <div className="absolute inset-0 opacity-[0.35] mix-blend-overlay" style={{
+      backgroundImage:
+        "radial-gradient(1px 1px at 20% 30%, rgba(255,220,180,0.35) 0, transparent 60%),radial-gradient(1px 1px at 70% 60%, rgba(0,0,0,0.5) 0, transparent 60%),radial-gradient(2px 2px at 40% 80%, rgba(255,200,150,0.15) 0, transparent 70%),radial-gradient(1px 1px at 85% 20%, rgba(0,0,0,0.4) 0, transparent 60%)",
+      backgroundSize: "6px 6px, 8px 8px, 12px 12px, 5px 5px",
+    }} />
+    {/* subtle scratches */}
+    <div className="absolute inset-0 opacity-25 mix-blend-soft-light" style={{
+      backgroundImage:
+        "repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 6px), repeating-linear-gradient(25deg, rgba(0,0,0,0.08) 0 1px, transparent 1px 9px)",
+    }} />
+    {/* stitched inner border */}
+    <div className="absolute inset-4 rounded-[6px] pointer-events-none" style={{
+      border: "1.5px dashed rgba(232,197,130,0.55)",
+      boxShadow: "inset 0 0 0 8px rgba(0,0,0,0.15), 0 0 30px rgba(0,0,0,0.4) inset",
+    }} />
+    {/* gold corner flourishes */}
+    {["top-3 left-3", "top-3 right-3", "bottom-3 left-3", "bottom-3 right-3"].map((pos) => (
+      <div key={pos} className={`absolute ${pos} w-8 h-8 rounded-sm`} style={{
+        border: "1px solid rgba(232,197,130,0.5)",
+        background: "linear-gradient(135deg, rgba(232,197,130,0.15), transparent 60%)",
+      }} />
+    ))}
+    {/* spine shadow bleed */}
+    <div className="absolute top-0 bottom-0 pointer-events-none" style={{
+      [side === "right" ? "left" : "right"]: 0,
+      width: 40,
+      background: side === "right"
+        ? "linear-gradient(90deg, rgba(0,0,0,0.55), rgba(0,0,0,0))"
+        : "linear-gradient(-90deg, rgba(0,0,0,0.55), rgba(0,0,0,0))",
+    } as any} />
+    {/* Centerpiece: knitted heart + words */}
+    {side === "right" && (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center">
+        <div className="relative">
+          <Heart className="w-24 h-24 md:w-28 md:h-28" style={{
+            color: "#e8c582",
+            fill: "rgba(232,197,130,0.12)",
+            strokeWidth: 1.2,
+            filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.4)) drop-shadow(0 0 18px rgba(232,197,130,0.35))",
+          }} />
+          {/* knitted stitching over the heart */}
+          <div className="absolute inset-0" style={{
+            WebkitMaskImage:
+              "radial-gradient(closest-side, black 55%, transparent 65%)",
+            maskImage:
+              "radial-gradient(closest-side, black 55%, transparent 65%)",
+            backgroundImage:
+              "repeating-linear-gradient(45deg, rgba(255,220,170,0.5) 0 2px, transparent 2px 5px), repeating-linear-gradient(-45deg, rgba(255,220,170,0.35) 0 2px, transparent 2px 5px)",
+          }} />
+        </div>
+        <div className="font-script italic text-3xl md:text-4xl tracking-wide" style={{
+          color: "#f0d9a6",
+          textShadow: "0 1px 0 rgba(0,0,0,0.5), 0 0 18px rgba(232,197,130,0.25)",
+          letterSpacing: "0.02em",
+          // knitted look on the text
+          backgroundImage:
+            "repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 1px, transparent 1px 3px)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text" as any,
+        }}>
+          Ours, always.
+        </div>
+        <div className="font-display text-xs md:text-sm tracking-[0.4em] uppercase" style={{ color: "rgba(232,197,130,0.75)" }}>
+          — a photobook —
+        </div>
+        <div className="mt-2 font-script italic text-sm opacity-80" style={{ color: "#e8c582" }}>
+          turn the page →
+        </div>
+      </div>
+    )}
+    {side === "left" && (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="font-script italic text-xl" style={{ color: "rgba(232,197,130,0.6)" }}>
+          bound in love · 2026
+        </div>
+      </div>
+    )}
+    {/* glossy sheen */}
+    <div className="absolute inset-0 pointer-events-none" style={{
+      background:
+        "linear-gradient(115deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.05) 100%)",
+    }} />
+  </div>
+);
 
 // Chunk photos into "leaves". Each leaf has a front (right-side) and back (left-side of next spread).
 // Spread N shows: left = leaves[N-1].back, right = leaves[N].front
@@ -71,17 +168,52 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
   // Preload neighbor pages for snappy flips
   useEffect(() => {
     const toPreload: string[] = [];
-    for (let d = -2; d <= 2; d++) {
+    for (let d = -3; d <= 3; d++) {
       const s = spread + d;
       if (s < 0 || s > total) continue;
       if (s > 0 && leaves[s - 1]?.back?.src) toPreload.push(leaves[s - 1].back.src);
       if (s < total && leaves[s]?.front?.src) toPreload.push(leaves[s].front.src);
     }
     toPreload.forEach((src) => {
-      const img = new Image();
-      img.src = src;
+      if (!photoCache.has(src)) {
+        const img = new Image();
+        img.decoding = "async";
+        img.src = src;
+        photoCache.add(src);
+      }
     });
   }, [spread, total, leaves]);
+
+  // Idle-time full prefetch + <link rel="prefetch"> for browser cache reuse across visits
+  useEffect(() => {
+    const all = photos.filter(Boolean);
+    const run = () => {
+      all.forEach((src) => {
+        if (photoCache.has(src)) return;
+        const img = new Image();
+        img.decoding = "async";
+        img.src = src;
+        photoCache.add(src);
+        // Hint the browser cache so future navigations reuse the entry
+        try {
+          if (!document.head.querySelector(`link[data-pb="${CSS.escape(src)}"]`)) {
+            const link = document.createElement("link");
+            link.rel = "prefetch";
+            link.as = "image";
+            link.href = src;
+            link.setAttribute("data-pb", src);
+            document.head.appendChild(link);
+          }
+        } catch {}
+      });
+    };
+    const ric: any = (window as any).requestIdleCallback;
+    const id = ric ? ric(run, { timeout: 2500 }) : window.setTimeout(run, 900);
+    return () => {
+      if (ric && (window as any).cancelIdleCallback) (window as any).cancelIdleCallback(id);
+      else window.clearTimeout(id as number);
+    };
+  }, [photos]);
 
   const go = (dir: "next" | "prev") => {
     if (flipping) return;
@@ -92,7 +224,24 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
     timer.current = window.setTimeout(() => {
       setSpread((s) => s + (dir === "next" ? 1 : -1));
       setFlipping(null);
-    }, 780);
+    }, FLIP_MS);
+  };
+
+  // Touch swipe for mobile — smooth, jank-free
+  const touch = useRef<{ x: number; y: number; t: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touch.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touch.current.x;
+    const dy = t.clientY - touch.current.y;
+    const dt = Date.now() - touch.current.t;
+    touch.current = null;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) || dt > 700) return;
+    go(dx < 0 ? "next" : "prev");
   };
 
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
@@ -128,7 +277,12 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
 
   return (
     <div className="w-full">
-      <div className="relative mx-auto" style={{ maxWidth: 920, perspective: "2200px" }}>
+      <div
+        className="relative mx-auto select-none"
+        style={{ maxWidth: 920, perspective: "2400px" }}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Book base with spine + shadow */}
         <div
           className="relative mx-auto rounded-[10px]"
@@ -150,11 +304,7 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
               {leftPage ? (
                 <PageFace page={leftPage} side="left" pageNum={spread * 2} eager={spread <= 1} />
               ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#3a1c08] to-[#1a0a03] text-[#e7c88a]">
-                  <BookOpen className="w-10 h-10 opacity-80" />
-                  <div className="font-display text-2xl md:text-3xl">Our Photobook</div>
-                  <div className="font-script italic text-lg opacity-80">turn the page →</div>
-                </div>
+                <LeatherCover side="left" />
               )}
             </div>
 
@@ -167,10 +317,12 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
               ) : flipping === "prev" && spread - 1 >= 0 && leaves[spread - 1] ? (
                 // Prev-flipping: the leaf being turned back exposes its own back underneath (same content briefly).
                 <PageFace page={leaves[spread - 1].back} side="right" pageNum={(spread - 1) * 2 + 2} />
-              ) : rightPage ? (
+              ) : rightPage && spread > 0 ? (
                 <div onClick={openLightbox} className="w-full h-full cursor-zoom-in">
                   <PageFace page={rightPage} side="right" pageNum={spread * 2 + 1} eager={spread <= 1} />
                 </div>
+              ) : rightPage && spread === 0 ? (
+                <LeatherCover side="right" />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#3a1c08] to-[#1a0a03] text-[#e7c88a]">
                   <div className="font-display text-2xl">The End</div>
@@ -182,23 +334,25 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
             {/* The flipping leaf */}
             {flipLeaf && (
               <div
-                className="absolute top-0 bottom-0 w-1/2 z-20"
+                className="absolute top-0 bottom-0 w-1/2 z-20 will-change-transform"
                 style={{
                   left: flipping === "next" ? "50%" : "0%",
                   transformStyle: "preserve-3d",
                   transformOrigin: flipping === "next" ? "left center" : "right center",
-                  transform: flipping === "next" ? "rotateY(-180deg)" : "rotateY(180deg)",
-                  transition: "transform 0.78s cubic-bezier(0.55, 0.05, 0.35, 1)",
-                  animation: flipping === "next" ? "flipNext 0.78s forwards" : "flipPrev 0.78s forwards",
+                  animation: flipping === "next"
+                    ? `flipNext ${FLIP_MS}ms cubic-bezier(0.6,0.02,0.32,1) forwards`
+                    : `flipPrev ${FLIP_MS}ms cubic-bezier(0.6,0.02,0.32,1) forwards`,
+                  backfaceVisibility: "hidden",
                 }}
               >
                 {/* Front face (the currently visible side before flipping) */}
-                <div className="absolute inset-0 overflow-hidden" style={{ backfaceVisibility: "hidden" }}>
+                <div className="absolute inset-0 overflow-hidden" style={{ backfaceVisibility: "hidden", transform: "translateZ(0.01px)" }}>
                   <PageFace
-                    page={flipping === "next" ? flipLeaf.front : flipLeaf.back}
+                    page={flipping === "next" ? (spread === 0 ? { src: "", caption: "cover" } : flipLeaf.front) : flipLeaf.back}
                     side={flipping === "next" ? "right" : "left"}
                     pageNum={flipping === "next" ? spread * 2 + 1 : spread * 2}
                   />
+                  {spread === 0 && flipping === "next" && <LeatherCover side="right" />}
                 </div>
                 {/* Back face (the one revealed as leaf turns) */}
                 <div
@@ -211,6 +365,14 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
                     pageNum={flipping === "next" ? spread * 2 + 2 : (spread - 1) * 2 + 1}
                   />
                 </div>
+                {/* soft moving shadow across the turning page */}
+                <div className="absolute inset-0 pointer-events-none" style={{
+                  background: flipping === "next"
+                    ? "linear-gradient(90deg, rgba(0,0,0,0.35), rgba(0,0,0,0) 60%)"
+                    : "linear-gradient(-90deg, rgba(0,0,0,0.35), rgba(0,0,0,0) 60%)",
+                  mixBlendMode: "multiply",
+                  opacity: 0.6,
+                }} />
               </div>
             )}
           </div>
