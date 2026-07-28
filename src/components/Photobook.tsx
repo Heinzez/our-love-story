@@ -3,6 +3,103 @@ import { ChevronLeft, ChevronRight, Heart, X } from "lucide-react";
 
 type Page = { src: string; caption: string };
 
+// Module-level cache: dedupes Image() prefetches within a session
+const photoCache = new Set<string>();
+const FLIP_MS = 720;
+
+const LeatherCover = ({ side }: { side: "left" | "right" }) => (
+  <div className="absolute inset-0 overflow-hidden">
+    {/* base leather */}
+    <div className="absolute inset-0" style={{
+      background:
+        "radial-gradient(120% 90% at 30% 20%, #6b2a17 0%, #4a180b 40%, #2a0c04 75%, #180602 100%)",
+    }} />
+    {/* leather grain */}
+    <div className="absolute inset-0 opacity-[0.35] mix-blend-overlay" style={{
+      backgroundImage:
+        "radial-gradient(1px 1px at 20% 30%, rgba(255,220,180,0.35) 0, transparent 60%),radial-gradient(1px 1px at 70% 60%, rgba(0,0,0,0.5) 0, transparent 60%),radial-gradient(2px 2px at 40% 80%, rgba(255,200,150,0.15) 0, transparent 70%),radial-gradient(1px 1px at 85% 20%, rgba(0,0,0,0.4) 0, transparent 60%)",
+      backgroundSize: "6px 6px, 8px 8px, 12px 12px, 5px 5px",
+    }} />
+    {/* subtle scratches */}
+    <div className="absolute inset-0 opacity-25 mix-blend-soft-light" style={{
+      backgroundImage:
+        "repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 6px), repeating-linear-gradient(25deg, rgba(0,0,0,0.08) 0 1px, transparent 1px 9px)",
+    }} />
+    {/* stitched inner border */}
+    <div className="absolute inset-4 rounded-[6px] pointer-events-none" style={{
+      border: "1.5px dashed rgba(232,197,130,0.55)",
+      boxShadow: "inset 0 0 0 8px rgba(0,0,0,0.15), 0 0 30px rgba(0,0,0,0.4) inset",
+    }} />
+    {/* gold corner flourishes */}
+    {["top-3 left-3", "top-3 right-3", "bottom-3 left-3", "bottom-3 right-3"].map((pos) => (
+      <div key={pos} className={`absolute ${pos} w-8 h-8 rounded-sm`} style={{
+        border: "1px solid rgba(232,197,130,0.5)",
+        background: "linear-gradient(135deg, rgba(232,197,130,0.15), transparent 60%)",
+      }} />
+    ))}
+    {/* spine shadow bleed */}
+    <div className="absolute top-0 bottom-0 pointer-events-none" style={{
+      [side === "right" ? "left" : "right"]: 0,
+      width: 40,
+      background: side === "right"
+        ? "linear-gradient(90deg, rgba(0,0,0,0.55), rgba(0,0,0,0))"
+        : "linear-gradient(-90deg, rgba(0,0,0,0.55), rgba(0,0,0,0))",
+    } as any} />
+    {/* Centerpiece: knitted heart + words */}
+    {side === "right" && (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center">
+        <div className="relative">
+          <Heart className="w-24 h-24 md:w-28 md:h-28" style={{
+            color: "#e8c582",
+            fill: "rgba(232,197,130,0.12)",
+            strokeWidth: 1.2,
+            filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.4)) drop-shadow(0 0 18px rgba(232,197,130,0.35))",
+          }} />
+          {/* knitted stitching over the heart */}
+          <div className="absolute inset-0" style={{
+            WebkitMaskImage:
+              "radial-gradient(closest-side, black 55%, transparent 65%)",
+            maskImage:
+              "radial-gradient(closest-side, black 55%, transparent 65%)",
+            backgroundImage:
+              "repeating-linear-gradient(45deg, rgba(255,220,170,0.5) 0 2px, transparent 2px 5px), repeating-linear-gradient(-45deg, rgba(255,220,170,0.35) 0 2px, transparent 2px 5px)",
+          }} />
+        </div>
+        <div className="font-script italic text-3xl md:text-4xl tracking-wide" style={{
+          color: "#f0d9a6",
+          textShadow: "0 1px 0 rgba(0,0,0,0.5), 0 0 18px rgba(232,197,130,0.25)",
+          letterSpacing: "0.02em",
+          // knitted look on the text
+          backgroundImage:
+            "repeating-linear-gradient(90deg, rgba(0,0,0,0.15) 0 1px, transparent 1px 3px)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text" as any,
+        }}>
+          Ours, always.
+        </div>
+        <div className="font-display text-xs md:text-sm tracking-[0.4em] uppercase" style={{ color: "rgba(232,197,130,0.75)" }}>
+          — a photobook —
+        </div>
+        <div className="mt-2 font-script italic text-sm opacity-80" style={{ color: "#e8c582" }}>
+          turn the page →
+        </div>
+      </div>
+    )}
+    {side === "left" && (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="font-script italic text-xl" style={{ color: "rgba(232,197,130,0.6)" }}>
+          bound in love · 2026
+        </div>
+      </div>
+    )}
+    {/* glossy sheen */}
+    <div className="absolute inset-0 pointer-events-none" style={{
+      background:
+        "linear-gradient(115deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.05) 100%)",
+    }} />
+  </div>
+);
+
 // Chunk photos into "leaves". Each leaf has a front (right-side) and back (left-side of next spread).
 // Spread N shows: left = leaves[N-1].back, right = leaves[N].front
 function useLeaves(photos: Page[]) {
