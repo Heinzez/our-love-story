@@ -332,6 +332,38 @@ const AdminPage = () => {
             </div>
           </Section>
 
+          {/* Photobook Cover */}
+          <Section title="Photobook Cover Text" icon={Gift} defaultOpen={false}>
+            <div className="space-y-3">
+              {([
+                { key: "cover_label", label: "Top label", value: coverLabelInput, set: setCoverLabelInput, fallback: settings?.coverLabel || "— for you —" },
+                { key: "cover_line1", label: "Line 1", value: coverLine1Input, set: setCoverLine1Input, fallback: settings?.coverLine1 || "Memories meant to last," },
+                { key: "cover_line2", label: "Line 2", value: coverLine2Input, set: setCoverLine2Input, fallback: settings?.coverLine2 || "Beauty & Magnificence." },
+              ] as const).map((f) => (
+                <div key={f.key}>
+                  <p className="text-foreground font-body text-sm mb-1.5">{f.label}</p>
+                  <div className="flex gap-3">
+                    <input
+                      value={f.value ?? f.fallback}
+                      maxLength={120}
+                      onChange={(e) => f.set(e.target.value)}
+                      className="flex-1 bg-muted/20 border border-border/30 rounded-xl px-3 py-2.5 text-foreground font-body text-sm focus:outline-none focus:border-primary/40"
+                    />
+                    <button
+                      onClick={() => settingsMutation.mutate({ key: f.key, value: (f.value ?? f.fallback).trim() })}
+                      disabled={settingsMutation.isPending}
+                      className="px-5 py-2.5 rounded-xl font-display text-sm tracking-wide text-primary-foreground transition-all disabled:opacity-50"
+                      style={{ background: "linear-gradient(135deg, hsl(338 80% 58%), hsl(355 70% 62%))" }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <p className="text-muted-foreground/50 font-body text-xs">Shown on the closed leather cover of the home photobook.</p>
+            </div>
+          </Section>
+
           {/* Email Notification */}
           <Section title="Send Her a Notification" icon={Mail}>
             <div className="space-y-4">
