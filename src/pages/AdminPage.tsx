@@ -8,7 +8,7 @@ import { useSite } from "@/context/SiteContext";
 import AdminPageEditor from "@/components/AdminPageEditor";
 import { supabase } from "@/integrations/supabase/client";
 
-type Settings = { giftLocked: boolean; weeklyGiftAmount: number };
+type Settings = { giftLocked: boolean; weeklyGiftAmount: number; coverLabel?: string; coverLine1?: string; coverLine2?: string };
 type Subscriber = { id: string; primaryEmail: string; backupEmail: string | null; subscribedAt: string };
 
 const Section = ({ title, icon: Icon, children, defaultOpen = true }: {
@@ -42,6 +42,9 @@ const AdminPage = () => {
   const [emailMessage, setEmailMessage] = useState("");
   const [emailResult, setEmailResult] = useState<{ sent: number; message?: string } | null>(null);
   const [weeklyAmountInput, setWeeklyAmountInput] = useState("");
+  const [coverLabelInput, setCoverLabelInput] = useState<string | null>(null);
+  const [coverLine1Input, setCoverLine1Input] = useState<string | null>(null);
+  const [coverLine2Input, setCoverLine2Input] = useState<string | null>(null);
   const [tgStatus, setTgStatus] = useState<{ info?: { url?: string; pending_update_count?: number; last_error_message?: string }; expectedUrl?: string; lastUpdate?: { text?: string; received_at?: string; chat_id?: number } | null } | null>(null);
   const [tgBusy, setTgBusy] = useState(false);
   const [tgErr, setTgErr] = useState<string | null>(null);
