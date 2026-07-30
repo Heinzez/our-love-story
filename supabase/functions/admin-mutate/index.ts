@@ -110,14 +110,17 @@ serve(async (req) => {
       return json({
         giftLocked: (map["gift_locked"] ?? "false") === "true",
         weeklyGiftAmount: parseInt(map["weekly_gift_amount"] ?? "500", 10),
+        coverLabel: map["cover_label"] ?? "",
+        coverLine1: map["cover_line1"] ?? "",
+        coverLine2: map["cover_line2"] ?? "",
       });
     }
 
     if (action === "set-setting") {
       const { key, value } = body as { key?: string; value?: string };
-      const allowed = new Set(["gift_locked", "weekly_gift_amount"]);
+      const allowed = new Set(["gift_locked", "weekly_gift_amount", "cover_label", "cover_line1", "cover_line2"]);
       if (!key || !allowed.has(key) || typeof value !== "string") return json({ error: "Invalid setting" }, 400);
-      const { error } = await supabase.from("site_settings").upsert({ key, value, updated_at: new Date().toISOString() });
+      const { error } = await supabase.from("site_settings").upsert({ key, value: value.slice(0, 120), updated_at: new Date().toISOString() });
       if (error) throw error;
       return json({ ok: true });
     }
