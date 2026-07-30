@@ -10,7 +10,9 @@ const FLIP_MS = 900;
 // Leather panel used for the closed cover and the inner cover pages.
 // `variant="closed"` shows the full title on the front of the shut book.
 // `variant="inner"` is the softer leather lining you see once the book opens.
-const LeatherCover = ({ variant = "inner" }: { variant?: "closed" | "inner" }) => (
+type CoverText = { label?: string; line1?: string; line2?: string };
+
+const LeatherCover = ({ variant = "inner", text }: { variant?: "closed" | "inner"; text?: CoverText }) => (
   <div
     className="absolute inset-0 overflow-hidden"
     style={{
@@ -41,18 +43,32 @@ const LeatherCover = ({ variant = "inner" }: { variant?: "closed" | "inner" }) =
     <div className="absolute inset-4 rounded-[3px] border border-[#c9964a]/25 pointer-events-none" />
 
     {variant === "closed" && (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
-        <div className="font-display text-[10px] md:text-xs tracking-[0.5em] uppercase text-[#e7c88a]/70">
-          — for you —
-        </div>
-        <div className="mt-2 font-script italic text-3xl md:text-5xl leading-tight text-[#f1d9a6] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
-          Memories meant to last,
-        </div>
-        <div className="font-script italic text-2xl md:text-4xl text-[#e7c88a] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
-          Beauty &amp; Magnificence.
-        </div>
-        <div className="mt-6 font-display text-[10px] tracking-[0.4em] uppercase text-[#c9964a]/70">
-          open →
+      <div className="absolute inset-0 grid place-items-center px-[8%] py-[10%] text-center">
+        <div className="flex flex-col items-center justify-center gap-[2%] w-full max-w-full">
+          <div
+            className="font-display uppercase text-[#e7c88a]/70 tracking-[0.5em]"
+            style={{ fontSize: "clamp(8px, 1.6cqw + 6px, 13px)" }}
+          >
+            {text?.label || "— for you —"}
+          </div>
+          <div
+            className="mt-[3%] font-script italic leading-[1.15] text-[#f1d9a6] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)] text-balance"
+            style={{ fontSize: "clamp(20px, 8cqw, 52px)" }}
+          >
+            {text?.line1 || "Memories meant to last,"}
+          </div>
+          <div
+            className="font-script italic leading-[1.15] text-[#e7c88a] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)] text-balance"
+            style={{ fontSize: "clamp(17px, 6.4cqw, 42px)" }}
+          >
+            {text?.line2 || "Beauty & Magnificence."}
+          </div>
+          <div
+            className="mt-[6%] font-display uppercase text-[#c9964a]/70 tracking-[0.4em]"
+            style={{ fontSize: "clamp(8px, 1.4cqw + 6px, 12px)" }}
+          >
+            open →
+          </div>
         </div>
       </div>
     )}
@@ -111,7 +127,7 @@ const PageFace = ({ page, side, pageNum, eager }: { page: Page; side: "left" | "
   );
 };
 
-const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] }) => {
+const Photobook = ({ photos, captions, cover }: { photos: string[]; captions: string[]; cover?: CoverText }) => {
   const pages: Page[] = photos.map((src, i) => ({ src, caption: captions[i % captions.length] ?? "" }));
   const leaves = useLeaves(pages);
   // spread index: 0 = cover (right only), 1..leaves.length-1 = middle, leaves.length = back
@@ -258,8 +274,16 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
           <div className="relative w-full h-full" style={{ transformStyle: "preserve-3d" }}>
             {isClosed ? (
               /* Single closed cover panel */
-              <div className="absolute inset-0 overflow-hidden rounded-[6px]">
-                <LeatherCover variant="closed" />
+              <div
+                className="absolute inset-0 overflow-hidden rounded-[6px] will-change-transform"
+                style={{
+                  containerType: "inline-size",
+                  transformOrigin: "left center",
+                  backfaceVisibility: "hidden",
+                  animation: flipping === "next" ? `coverOpen ${FLIP_MS}ms cubic-bezier(0.4,0.02,0.2,1) forwards` : undefined,
+                }}
+              >
+                <LeatherCover variant="closed" text={cover} />
               </div>
             ) : (
               <>
@@ -351,17 +375,17 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
           onClick={() => go("prev")}
           disabled={!canPrev || !!flipping || isClosed}
           aria-label="Previous page"
-          className={`absolute left-2 md:-left-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-0 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40`}
+          className="absolute left-1 md:-left-8 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/70 backdrop-blur-md border-2 border-primary/60 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:border-primary hover:scale-110 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-0 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <ChevronLeft className="w-7 h-7" />
         </button>
         <button
           onClick={() => go("next")}
           disabled={!canNext || !!flipping}
           aria-label={isClosed ? "Open book" : "Next page"}
-          className="absolute right-2 md:-right-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-primary/50 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:scale-110 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
+          className="absolute right-1 md:-right-8 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/70 backdrop-blur-md border-2 border-primary/60 text-primary shadow-[0_8px_24px_rgba(0,0,0,0.5)] hover:bg-primary/30 hover:border-primary hover:scale-110 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center z-40"
         >
-          <ChevronRight className="w-6 h-6" />
+          <ChevronRight className="w-7 h-7" />
         </button>
       </div>
 
@@ -392,6 +416,14 @@ const Photobook = ({ photos, captions }: { photos: string[]; captions: string[] 
         @keyframes flipPrev {
           from { transform: rotateY(0deg); }
           to   { transform: rotateY(180deg); }
+        }
+        @keyframes coverOpen {
+          from { transform: rotateY(0deg); opacity: 1; }
+          70%  { transform: rotateY(-118deg); opacity: 1; }
+          to   { transform: rotateY(-160deg); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [style*="flipNext"], [style*="flipPrev"], [style*="coverOpen"] { animation-duration: 1ms !important; }
         }
       `}</style>
     </div>
