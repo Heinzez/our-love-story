@@ -368,6 +368,17 @@ const LandingPage = () => {
   const [showBackup, setShowBackup] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [cover, setCover] = useState<{ label?: string; line1?: string; line2?: string }>({});
+
+  useEffect(() => {
+    let active = true;
+    supabase.functions.invoke("admin-mutate", { body: { action: "get-settings" } }).then(({ data }) => {
+      if (!active || !data) return;
+      const d = data as { coverLabel?: string; coverLine1?: string; coverLine2?: string };
+      setCover({ label: d.coverLabel || undefined, line1: d.coverLine1 || undefined, line2: d.coverLine2 || undefined });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const allLandingMedia = pageImages["landing"] ?? [];
   const uploadedPhotos = allLandingMedia.filter((m) => (m.media_type ?? "image") === "image");
@@ -474,7 +485,7 @@ const LandingPage = () => {
           )}
         </div>
 
-        <Photobook photos={allPhotos} captions={captions} />
+        <Photobook photos={allPhotos} captions={captions} cover={cover} />
 
         {/* Add Photos row */}
         <div className="mt-20 pt-6 border-t border-border/20">
