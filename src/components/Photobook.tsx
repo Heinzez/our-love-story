@@ -10,7 +10,9 @@ const FLIP_MS = 900;
 // Leather panel used for the closed cover and the inner cover pages.
 // `variant="closed"` shows the full title on the front of the shut book.
 // `variant="inner"` is the softer leather lining you see once the book opens.
-const LeatherCover = ({ variant = "inner" }: { variant?: "closed" | "inner" }) => (
+type CoverText = { label?: string; line1?: string; line2?: string };
+
+const LeatherCover = ({ variant = "inner", text }: { variant?: "closed" | "inner"; text?: CoverText }) => (
   <div
     className="absolute inset-0 overflow-hidden"
     style={{
@@ -41,18 +43,32 @@ const LeatherCover = ({ variant = "inner" }: { variant?: "closed" | "inner" }) =
     <div className="absolute inset-4 rounded-[3px] border border-[#c9964a]/25 pointer-events-none" />
 
     {variant === "closed" && (
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
-        <div className="font-display text-[10px] md:text-xs tracking-[0.5em] uppercase text-[#e7c88a]/70">
-          — for you —
-        </div>
-        <div className="mt-2 font-script italic text-3xl md:text-5xl leading-tight text-[#f1d9a6] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
-          Memories meant to last,
-        </div>
-        <div className="font-script italic text-2xl md:text-4xl text-[#e7c88a] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
-          Beauty &amp; Magnificence.
-        </div>
-        <div className="mt-6 font-display text-[10px] tracking-[0.4em] uppercase text-[#c9964a]/70">
-          open →
+      <div className="absolute inset-0 grid place-items-center px-[8%] py-[10%] text-center">
+        <div className="flex flex-col items-center justify-center gap-[2%] w-full max-w-full">
+          <div
+            className="font-display uppercase text-[#e7c88a]/70 tracking-[0.5em]"
+            style={{ fontSize: "clamp(8px, 1.6cqw + 6px, 13px)" }}
+          >
+            {text?.label || "— for you —"}
+          </div>
+          <div
+            className="mt-[3%] font-script italic leading-[1.15] text-[#f1d9a6] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)] text-balance"
+            style={{ fontSize: "clamp(20px, 8cqw, 52px)" }}
+          >
+            {text?.line1 || "Memories meant to last,"}
+          </div>
+          <div
+            className="font-script italic leading-[1.15] text-[#e7c88a] drop-shadow-[0_2px_0_rgba(0,0,0,0.4)] text-balance"
+            style={{ fontSize: "clamp(17px, 6.4cqw, 42px)" }}
+          >
+            {text?.line2 || "Beauty & Magnificence."}
+          </div>
+          <div
+            className="mt-[6%] font-display uppercase text-[#c9964a]/70 tracking-[0.4em]"
+            style={{ fontSize: "clamp(8px, 1.4cqw + 6px, 12px)" }}
+          >
+            open →
+          </div>
         </div>
       </div>
     )}
