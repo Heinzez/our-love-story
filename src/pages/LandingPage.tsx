@@ -37,6 +37,7 @@ import photo36 from "@/assets/photo36.jpg";
 import photo37 from "@/assets/photo37.jpg";
 import FloatingElements from "@/components/FloatingElements";
 import Photobook from "@/components/Photobook";
+import VhsPlayer from "@/components/VhsPlayer";
 import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight, Plus, ImagePlus, Loader2, Trash2, Video, Film } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useState, useCallback, useEffect, useRef } from "react";
