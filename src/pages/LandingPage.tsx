@@ -37,6 +37,7 @@ import photo36 from "@/assets/photo36.jpg";
 import photo37 from "@/assets/photo37.jpg";
 import FloatingElements from "@/components/FloatingElements";
 import Photobook from "@/components/Photobook";
+import VhsPlayer from "@/components/VhsPlayer";
 import { Heart, Lock, Mail, Sparkles, X, ChevronLeft, ChevronRight, Plus, ImagePlus, Loader2, Trash2, Video, Film } from "lucide-react";
 import { useSite } from "@/context/SiteContext";
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -513,23 +514,11 @@ const LandingPage = () => {
           <p className="text-muted-foreground text-sm font-body">your voice, your laugh, your magic ✨</p>
         </div>
 
-        {uploadedVideos.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-            {uploadedVideos.map((v) => (
-              <div key={v.id} className="glass-card rounded-2xl overflow-hidden border border-primary/20 hover:border-primary/40 transition-all">
-                <video
-                  src={v.publicUrl}
-                  controls
-                  preload="metadata"
-                  className="w-full bg-black aspect-video"
-                />
-                {v.caption && (
-                  <p className="text-xs text-muted-foreground font-body p-3 text-center italic">"{v.caption}"</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="mb-10">
+          <VhsPlayer
+            clips={uploadedVideos.map((v) => ({ id: v.id, url: v.publicUrl, caption: v.caption }))}
+          />
+        </div>
 
         <div className="flex justify-center">
           <MediaUploadButton kind="video" onUploaded={() => refreshPageData()} />
